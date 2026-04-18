@@ -25,7 +25,7 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --name BiliDownloader --add-data "lang;lang" --console=false --onefile gui.py
+        pyinstaller --name BiliDownloader --add-data "lang;lang" --windowed --onefile gui.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
