@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.venv
+env/
+venv/
+env.bak/
+venv.bak/
+
+# Binary files
+*.exe
+*.dll
+*.data
+*.crt
+
+# Specific to BiliDownloader
+BBDown.exe
+BBDown.data
+aria2c.exe
+avcodec-61.dll
+avdevice-61.dll
+avfilter-10.dll
+avformat-61.dll
+avutil-59.dll
+curl.exe
+ffmpeg.exe
+libcurl-x64.dll
+postproc-58.dll
+swresample-5.dll
+swscale-8.dll
+qrcode.png
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# URLs
+*.url
+
+# Text files
+*.txt
+
+# Logs
+*.log
