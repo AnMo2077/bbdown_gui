@@ -1,325 +1,264 @@
-import customtkinter as ctk
-from customtkinter import CTkMessageBox
+import tkinter as tk
+from tkinter import messagebox
 import requests
 import webbrowser
 import os
-import subprocess
-import threading
-import json
-import gettext
-import locale
-
-ctk.set_appearance_mode("system")
-ctk.set_default_color_theme("blue")
-
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-LANG_DIR = os.path.join(APP_DIR, "lang")
-
-LANGUAGES = {
-    "简体中文": "zh_CN",
-    "English": "en_US"
-}
-
-class I18n:
-    def __init__(self):
-        self.current_lang = "zh_CN"
-        self.translations = {}
-        self._ = lambda s: s
-        self.load_translations()
-
-    def load_translations(self):
-        for name, code in LANGUAGES.items():
-            lang_file = os.path.join(LANG_DIR, f"{code}.json")
-            if os.path.exists(lang_file):
-                with open(lang_file, "r", encoding="utf-8") as f:
-                    self.translations[code] = json.load(f)
-            else:
-                self.translations[code] = {}
-
-        try:
-            system_lang = locale.getdefaultlocale()[0]
-            if system_lang == "zh_CN":
-                self.current_lang = "zh_CN"
-            else:
-                self.current_lang = "en_US"
-        except:
-            self.current_lang = "zh_CN"
-
-        self._ = lambda s: self.translations.get(self.current_lang, {}).get(s, s)
-
-    def set_lang(self, lang_code):
-        self.current_lang = lang_code
-        self._ = lambda s: self.translations.get(lang_code, {}).get(s, s)
-
-    def get_text(self, key):
-        return self._(key)
-
-i18n = I18n()
 
 class BiliDownloaderGUI:
     def __init__(self, root):
         self.root = root
+        self.root.title("BiliDownloader GUI")
         self.version = "1.1"
-        self.ad = ""
-        self.log = ""
-        self.prog_ver = ""
-        self.url = ""
         self.setup_ui()
         self.fetch_remote_data()
 
     def setup_ui(self):
-        self.root.title(i18n.get_text("app_title"))
-        self.root.geometry("500x450")
-        self.root.resizable(False, False)
-
-        main_frame = ctk.CTkFrame(self.root, corner_radius=15)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        title_label = ctk.CTkLabel(main_frame, text="BiliDownloader By AnMo_C",
-                                    font=ctk.CTkFont(size=20, weight="bold"))
-        title_label.pack(pady=(10, 5))
-
-        version_label = ctk.CTkLabel(main_frame, text=f"{i18n.get_text('version')}: {self.version}",
-                                      text_color="gray")
-        version_label.pack(pady=(0, 10))
-
-        self.ad_label = ctk.CTkLabel(main_frame, text=i18n.get_text("loading_announcement"),
-                                       wraplength=400, height=60)
-        self.ad_label.pack(pady=10, padx=10)
-
-        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        btn_frame.pack(pady=10)
-
-        buttons = [
-            (i18n.get_text("login"), self.login),
-            (i18n.get_text("download"), self.download),
-            (i18n.get_text("changelog"), self.show_log),
-            (i18n.get_text("help"), self.show_help),
-            (i18n.get_text("license"), self.show_license),
-            (i18n.get_text("donate"), self.donate),
-        ]
-
-        for i, (text, cmd) in enumerate(buttons):
-            row = i // 2
-            col = i % 2
-            btn = ctk.CTkButton(btn_frame, text=text, command=cmd, width=180, height=40)
-            btn.grid(row=row, column=col, padx=10, pady=5)
-
-        self.lang_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        self.lang_frame.pack(side="bottom", pady=(20, 0))
-
-        self.lang_label = ctk.CTkLabel(self.lang_frame, text=i18n.get_text("language") + ":")
-        self.lang_label.pack(side="left", padx=5)
-
-        self.lang_var = ctk.StringVar(value=list(LANGUAGES.keys())[0])
-        lang_menu = ctk.CTkOptionMenu(self.lang_frame, values=list(LANGUAGES.keys()),
-                                       variable=self.lang_var, command=self.change_language,
-                                       width=120)
-        lang_menu.pack(side="left", padx=5)
-
-        exit_btn = ctk.CTkButton(main_frame, text=i18n.get_text("exit"),
-                                  command=self.root.quit, fg_color="red", hover_color="darkred",
-                                  width=180, height=40)
-        exit_btn.pack(pady=20)
-
-    def change_language(self, lang_name):
-        lang_code = LANGUAGES.get(lang_name, "zh_CN")
-        i18n.set_lang(lang_code)
-        self.refresh_ui()
-
-    def refresh_ui(self):
-        for widget in self.root.winfo_children():
-            widget.destroy()
-        self.setup_ui()
-        self.ad_label.config(text=self.ad)
+        # 主界面布局
+        self.main_frame = tk.Frame(self.root)
+        self.main_frame.pack(padx=20, pady=20)
+        
+        # 标题和版本信息
+        tk.Label(self.main_frame, text="BiliDownloader By AnMo_C", font=("Arial", 16)).grid(row=0, column=0, columnspan=2, pady=10)
+        tk.Label(self.main_frame, text=f"版本: {self.version}").grid(row=1, column=0, columnspan=2)
+        
+        # 公告区域
+        self.ad_label = tk.Label(self.main_frame, text="正在获取公告...", wraplength=300)
+        self.ad_label.grid(row=2, column=0, columnspan=2, pady=10)
+        
+        # 功能按钮
+        tk.Button(self.main_frame, text="登录B站账号", command=self.login).grid(row=3, column=0, pady=5, sticky="ew")
+        tk.Button(self.main_frame, text="下载视频", command=self.download).grid(row=3, column=1, pady=5, sticky="ew")
+        tk.Button(self.main_frame, text="更新日志", command=self.show_log).grid(row=4, column=0, pady=5, sticky="ew")
+        tk.Button(self.main_frame, text="使用帮助", command=self.show_help).grid(row=4, column=1, pady=5, sticky="ew")
+        tk.Button(self.main_frame, text="开放源代码许可", command=self.show_license).grid(row=5, column=0, pady=5, sticky="ew")
+        tk.Button(self.main_frame, text="捐赠", command=self.donate).grid(row=5, column=1, pady=5, sticky="ew")
+        tk.Button(self.main_frame, text="退出", command=self.root.quit).grid(row=7, column=0, pady=5, sticky="ew")
 
     def fetch_remote_data(self):
         try:
-            response = requests.get("https://api.nzs233.xyz/bilidown.txt", timeout=10)
+            response = requests.get("https://api.anmoc.top/bilidown.txt")
             if response.status_code == 200:
                 response.encoding = 'gbk'
                 data = response.text
+                # 解析远程数据
                 self.ad = self.parse_value(data, "ad=")
                 self.log = self.parse_value(data, "log=")
                 self.prog_ver = self.parse_value(data, "prog_ver=")
                 self.url = self.parse_value(data, "url=")
-
-                self.ad_label.configure(text=self.ad)
-
+                
+                # 更新UI
+                self.ad_label.config(text=self.ad)
+                
+                # 检查版本
                 if self.version != self.prog_ver:
                     self.show_update_message()
             else:
-                self.ad_label.configure(text=i18n.get_text("network_error"))
-
-            bbd_path = os.path.join(APP_DIR, "BBDown.exe")
-            curl_path = os.path.join(APP_DIR, "curl.exe")
+                self.ad_label.config(text="网络异常获取公告失败请检查网络后重试")
+                
+            # 检查核心文件是否存在
+            # 检查核心文件是否存在
+            bbd_path = os.path.join(os.path.dirname(__file__), "BBDown.exe")
+            curl_path = os.path.join(os.path.dirname(__file__), "curl.exe")
             if not os.path.exists(bbd_path) or not os.path.exists(curl_path):
-                CTkMessageBox(title=i18n.get_text("error"),
-                              message=f"{i18n.get_text('missing_files')}\nBBDown.exe: {bbd_path}\ncurl.exe: {curl_path}",
-                              icon="cancel")
+                messagebox.showerror("错误", f"缺少必要文件:\nBBDown.exe路径: {bbd_path}\ncurl.exe路径: {curl_path}\n请确保文件放在程序目录下")
                 self.root.quit()
         except Exception as e:
-            self.ad_label.configure(text=f"{i18n.get_text('fetch_failed')}: {str(e)}")
-
+            self.ad_label.config(text=f"获取远程数据失败: {str(e)}")
+    
     def parse_value(self, data, key):
-        for line in data.splitlines():
+        lines = data.splitlines()
+        for line in lines:
             if line.startswith(key):
                 return line[len(key):].strip()
         return ""
-
+    
     def show_update_message(self):
-        win = ctk.CTkToplevel(self.root)
-        win.title(i18n.get_text("new_version"))
-        win.geometry("350x200")
-        win.grab_set()
-
-        ctk.CTkLabel(win, text=f"{i18n.get_text('found_version')} {self.prog_ver}",
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=15)
-        ctk.CTkLabel(win, text=f"{i18n.get_text('changelog')}: {self.log}", wraplength=300).pack(pady=10)
-
-        btn_frame = ctk.CTkFrame(win, fg_color="transparent")
-        btn_frame.pack(pady=15)
-        ctk.CTkButton(btn_frame, text=i18n.get_text("download_update"),
-                      command=lambda: [webbrowser.open(self.url), self.root.quit()]).pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text=i18n.get_text("cancel"), command=self.root.quit,
-                      fg_color="gray").pack(side="left", padx=5)
-
+        update_window = tk.Toplevel(self.root)
+        update_window.title("发现新版本")
+        update_window.grab_set()  # 设置为模态窗口
+        update_window.transient(self.root)  # 设置为主窗口的子窗口
+        
+        tk.Label(update_window, text=f"发现新版本 {self.prog_ver}", font=("Arial", 12)).pack(pady=10)
+        tk.Label(update_window, text=f"更新日志: {self.log}", wraplength=300).pack(pady=5)
+        tk.Button(update_window, text="下载更新", command=lambda: [webbrowser.open(self.url), self.root.quit()]).pack(pady=10)
+        tk.Button(update_window, text="取消", command=self.root.quit).pack(pady=5)
+    
     def login(self):
-        bbd_path = os.path.join(APP_DIR, "BBDown.exe")
-        if not os.path.exists(bbd_path):
-            CTkMessageBox(title=i18n.get_text("error"), message=i18n.get_text("bbdown_not_found"), icon="cancel")
-            return
-
-        def async_login():
-            try:
-                os.chdir(APP_DIR)
-                process = subprocess.Popen([bbd_path, "login"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                process.wait()
-
-                qrcode_path = os.path.join(APP_DIR, "qrcode.png")
-                abs_path = os.path.abspath(qrcode_path)
-
-                if os.path.exists(abs_path):
-                    try:
-                        os.startfile(abs_path)
-                        self.root.after(0, lambda: CTkMessageBox(title=i18n.get_text("login"),
-                                                                   message=i18n.get_text("scan_qrcode"), icon="info"))
-                    except Exception:
-                        webbrowser.open(abs_path)
-                        self.root.after(0, lambda: CTkMessageBox(title=i18n.get_text("login"),
-                                                                   message=i18n.get_text("scan_qrcode"), icon="info"))
-                else:
-                    self.root.after(0, lambda: CTkMessageBox(title=i18n.get_text("error"),
-                                                               message=i18n.get_text("qrcode_failed"), icon="cancel"))
-            except Exception as e:
-                self.root.after(0, lambda: CTkMessageBox(title=i18n.get_text("error"),
-                                                           message=f"{i18n.get_text('login_failed')}: {str(e)}", icon="cancel"))
-
-        threading.Thread(target=async_login, daemon=True).start()
-
+        # 实现登录功能
+        try:
+            # 调用BBDown.exe执行登录命令
+            bbd_path = os.path.join(os.path.dirname(__file__), "BBDown.exe")
+            if not os.path.exists(bbd_path):
+                messagebox.showerror("错误", "找不到BBDown.exe，请确保文件放在程序目录下")
+                return
+            
+            # 执行登录命令(异步)
+            import subprocess
+            import threading
+            
+            def async_login():
+                try:
+                    # 设置工作目录为程序所在目录
+                    os.chdir(os.path.dirname(__file__))
+                    process = subprocess.Popen([bbd_path, "login"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    process.wait()
+                    
+                    # 检查并打开二维码图片
+                    qrcode_path = os.path.join(os.path.dirname(__file__), "qrcode.png")
+                    abs_path = os.path.abspath(qrcode_path)
+                    
+                    # 确保二维码文件已生成
+                    if os.path.exists(abs_path):
+                        # 使用系统默认程序打开文件
+                        try:
+                            os.startfile(abs_path)
+                            self.root.after(0, lambda: messagebox.showinfo("登录", "请扫描二维码登录B站账号"))
+                        except Exception as e:
+                            print(f"系统打开失败: {str(e)}")
+                            try:
+                                webbrowser.open(abs_path)
+                                self.root.after(0, lambda: messagebox.showinfo("登录", "请扫描二维码登录B站账号"))
+                            except Exception as e:
+                                print(f"备用方法失败: {str(e)}")
+                                self.root.after(0, lambda: messagebox.showerror("错误", f"无法打开二维码文件: {abs_path}"))
+                    else:
+                        self.root.after(0, lambda: messagebox.showerror("错误", "二维码文件生成失败，请重试"))
+                except Exception as e:
+                    self.root.after(0, lambda: messagebox.showerror("错误", f"登录过程中发生错误: {str(e)}"))
+            
+            # 启动异步登录线程
+            threading.Thread(target=async_login, daemon=True).start()
+        except subprocess.CalledProcessError:
+            messagebox.showerror("错误", "登录命令执行失败")
+        except Exception as e:
+            messagebox.showerror("错误", f"登录过程中发生错误: {str(e)}")
+    
     def download(self):
-        win = ctk.CTkToplevel(self.root)
-        win.title(i18n.get_text("download_video"))
-        win.geometry("450x350")
-
-        ctk.CTkLabel(win, text=i18n.get_text("input_url"), font=ctk.CTkFont(weight="bold")).pack(pady=10)
-
-        self.video_url = ctk.CTkEntry(win, width=350, placeholder_text="https://www.bilibili.com/video/BV...")
-        self.video_url.pack(pady=5)
-
-        ctk.CTkLabel(win, text=i18n.get_text("select_part"), font=ctk.CTkFont(weight="bold")).pack(pady=(15, 5))
-
-        self.part_selection = ctk.StringVar(value="all")
-        ctk.CTkRadioButton(win, text=i18n.get_text("download_all"), variable=self.part_selection,
-                           value="all").pack(anchor="w", padx=50)
-        ctk.CTkRadioButton(win, text=i18n.get_text("download_specific"), variable=self.part_selection,
-                           value="specific").pack(anchor="w", padx=50)
-
-        range_frame = ctk.CTkFrame(win, fg_color="transparent")
-        range_frame.pack(pady=10)
-
-        self.start_p = ctk.CTkEntry(range_frame, width=80, placeholder_text="1")
-        self.start_p.pack(side="left", padx=5)
-        ctk.CTkLabel(range_frame, text="-").pack(side="left")
-        self.end_p = ctk.CTkEntry(range_frame, width=80, placeholder_text="10")
-        self.end_p.pack(side="left", padx=5)
-
-        ctk.CTkButton(win, text=i18n.get_text("start_download"), command=lambda: self.start_download(win),
-                      width=200, height=40).pack(pady=20)
-
-    def start_download(self, win):
+        # 创建下载窗口
+        download_window = tk.Toplevel(self.root)
+        download_window.title("下载视频")
+        download_window.geometry("400x300")
+        
+        # 添加输入框
+        tk.Label(download_window, text="请输入B站视频链接:").pack(pady=10)
+        self.video_url = tk.StringVar()
+        url_entry = tk.Entry(download_window, textvariable=self.video_url, width=40)
+        
+        # 添加右键菜单
+        menu = tk.Menu(url_entry, tearoff=0)
+        menu.add_command(label="粘贴", command=lambda: url_entry.event_generate('<<Paste>>'))
+        url_entry.bind("<Button-3>", lambda e: menu.post(e.x_root, e.y_root))
+        
+        url_entry.pack()
+        
+        # 添加分P选择
+        tk.Label(download_window, text="请选择分P:").pack(pady=5)
+        self.part_selection = tk.StringVar(value="all")
+        tk.Radiobutton(download_window, text="下载全部", variable=self.part_selection, value="all").pack(anchor="w")
+        tk.Radiobutton(download_window, text="下载特定分P", variable=self.part_selection, value="specific").pack(anchor="w")
+        
+        # 添加分P范围输入
+        self.start_p_frame = tk.Frame(download_window)
+        self.start_p_frame.pack(anchor="w")
+        tk.Label(self.start_p_frame, text="起始P:").pack(side="left")
+        self.start_p = tk.StringVar()
+        tk.Entry(self.start_p_frame, textvariable=self.start_p, width=5).pack(side="left")
+        
+        self.end_p_frame = tk.Frame(download_window)
+        self.end_p_frame.pack(anchor="w")
+        tk.Label(self.end_p_frame, text="结束P:").pack(side="left")
+        self.end_p = tk.StringVar()
+        tk.Entry(self.end_p_frame, textvariable=self.end_p, width=5).pack(side="left")
+        
+        # 添加确认按钮
+        tk.Button(download_window, text="下载", command=self.start_download).pack(pady=15, side="bottom", anchor="center")
+        
+    def close_all_child_windows(self):
+        """关闭所有子窗口，仅保留主窗口"""
+        for child in self.root.winfo_children():
+            if isinstance(child, tk.Toplevel):
+                child.destroy()
+                
+    def start_download(self):
+        # 获取视频链接并开始下载
         url = self.video_url.get()
-        if not url:
-            CTkMessageBox(title=i18n.get_text("error"), message=i18n.get_text("invalid_url"), icon="cancel")
-            return
-
-        bbd_path = os.path.join(APP_DIR, "BBDown.exe")
-        if not os.path.exists(bbd_path):
-            CTkMessageBox(title=i18n.get_text("error"), message=i18n.get_text("bbdown_not_found"), icon="cancel")
-            return
-
-        command = [bbd_path, url, "-aria2"]
-        if self.part_selection.get() == "specific":
-            start = self.start_p.get()
-            end = self.end_p.get()
-            if start and end:
-                command.extend(["-p", f"{start}-{end}"])
-
-        progress_win = ctk.CTkToplevel(self.root)
-        progress_win.title(i18n.get_text("downloading"))
-        progress_win.geometry("400x120")
-        progress_win.grab_set()
-
-        ctk.CTkLabel(progress_win, text=i18n.get_text("downloading_video")).pack(pady=10)
-        self.progress_label = ctk.CTkLabel(progress_win, text="0%")
-        self.progress_label.pack()
-
-        def async_download():
+        if url:
             try:
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                            universal_newlines=True, cwd=APP_DIR)
-                for line in iter(process.stdout.readline, ''):
-                    if line:
-                        self.root.after(0, lambda l=line: self.progress_label.configure(text=l.strip()))
-                    if process.poll() is not None:
-                        break
-
-                self.root.after(0, lambda: [progress_win.destroy(), self.show_download_complete()])
+                # 调用BBDown.exe下载视频
+                bbd_path = os.path.join(os.path.dirname(__file__), "BBDown.exe")
+                if not os.path.exists(bbd_path):
+                    messagebox.showerror("错误", "找不到BBDown.exe，请确保文件放在程序目录下")
+                    return
+                
+                # 根据选择构建命令
+                command = [bbd_path, url, "-aria2"]
+                if self.part_selection.get() == "specific":
+                    if self.start_p.get() and self.end_p.get():
+                        command.extend(["-p", f"{self.start_p.get()}-{self.end_p.get()}"])
+                    else:
+                        part_num = simpledialog.askinteger("分P选择", "请输入要下载的分P编号:")
+                        if part_num:
+                            command.extend(["-p", str(part_num)])
+                
+                # 创建下载进度窗口
+                progress_window = tk.Toplevel(self.root)
+                progress_window.title("下载进度")
+                progress_window.geometry("400x100")
+                
+                tk.Label(progress_window, text="正在下载视频...").pack(pady=10)
+                progress = tk.Label(progress_window, text="0%")
+                progress.pack()
+                
+                # 启动下载进程
+                import subprocess
+                process = subprocess.Popen(command, 
+                                         stdout=subprocess.PIPE, 
+                                         stderr=subprocess.PIPE,
+                                         universal_newlines=True)
+                
+                # 更新进度
+                def update_progress():
+                    output = process.stdout.readline()
+                    if "%" in output:
+                        progress.config(text=output.strip())
+                    if process.poll() is None:
+                        progress_window.after(100, update_progress)
+                    else:
+                        progress_window.destroy()
+                        confirm_window = tk.Toplevel(self.root)
+                        confirm_window.title("下载完成")
+                        confirm_window.geometry("300x100")
+                        tk.Label(confirm_window, text="视频下载完成！").pack(pady=10)
+                        tk.Button(confirm_window, text="确定", command=lambda: [confirm_window.destroy(), self.close_all_child_windows()]).pack(pady=10)
+                
+                progress_window.after(100, update_progress)
+                
             except Exception as e:
-                self.root.after(0, lambda: [progress_win.destroy(),
-                                             CTkMessageBox(title=i18n.get_text("error"),
-                                                           message=f"{i18n.get_text('download_failed')}: {str(e)}", icon="cancel")])
-
-        threading.Thread(target=async_download, daemon=True).start()
-
-    def show_download_complete(self):
-        complete_win = ctk.CTkToplevel(self.root)
-        complete_win.title(i18n.get_text("download_complete"))
-        complete_win.geometry("300x100")
-        complete_win.grab_set()
-
-        ctk.CTkLabel(complete_win, text=i18n.get_text("download_finished")).pack(pady=20)
-        ctk.CTkButton(complete_win, text="OK", command=complete_win.destroy, width=100).pack()
-
+                messagebox.showerror("错误", f"下载失败: {str(e)}")
+        else:
+            messagebox.showerror("错误", "请输入有效的视频链接")
+    
     def show_log(self):
-        win = ctk.CTkToplevel(self.root)
-        win.title(i18n.get_text("changelog"))
-        win.geometry("400x300")
-
-        scroll = ctk.CTkScrollableFrame(win)
-        scroll.pack(fill="both", expand=True, padx=10, pady=10)
-        ctk.CTkLabel(scroll, text=self.log, wraplength=350).pack()
-
+        # 显示更新日志
+        log_window = tk.Toplevel(self.root)
+        log_window.title("更新日志")
+        
+        tk.Label(log_window, text=self.log, wraplength=300).pack(padx=20, pady=20)
+        tk.Button(log_window, text="关闭", command=log_window.destroy).pack(pady=10)
+        
     def show_license(self):
-        webbrowser.open("https://api.nzs233.xyz/bilidownlicense.txt")
-
+        # 显示开源许可
+        webbrowser.open("https://api.anmoc.top/bilidownlicense.txt")
+        
     def show_help(self):
-        webbrowser.open("https://api.nzs233.xyz/bilidownhelp.txt")
-
+        # 显示使用帮助
+        webbrowser.open("https://api.anmoc.top/bilidownhelp.txt")
+        
     def donate(self):
-        webbrowser.open("https://nzs233.xyz/eat")
+        # 打开捐赠页面
+        webbrowser.open("https://anmoc.top/eat")
 
 if __name__ == "__main__":
-    root = ctk.CTk()
+    root = tk.Tk()
     app = BiliDownloaderGUI(root)
     root.mainloop()

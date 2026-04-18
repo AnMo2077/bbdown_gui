@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<translations>
+  <translation key="app_title">BiliDownloader GUI</translation>
+  <translation key="login">登录B站账号</translation>
+  <translation key="download">下载视频</translation>
+  <translation key="changelog">更新日志</translation>
+  <translation key="help">使用帮助</translation>
+  <translation key="license">开放源代码许可</translation>
+  <translation key="donate">捐赠</translation>
+  <translation key="exit">退出</translation>
+  <translation key="language">语言</translation>
+  <translation key="loading_announcement">正在获取公告...</translation>
+  <translation key="network_error">网络异常获取公告失败请检查网络后重试</translation>
+  <translation key="error">错误</translation>
+  <translation key="missing_files">缺少必要文件</translation>
+  <translation key="bbdown_not_found">找不到BBDown.exe，请确保文件放在程序目录下</translation>
+  <translation key="qrcode_failed">二维码文件生成失败，请重试</translation>
+  <translation key="login_failed">登录过程中发生错误</translation>
+  <translation key="scan_qrcode">请扫描二维码登录B站账号</translation>
+  <translation key="download_video">下载视频</translation>
+  <translation key="input_url">请输入B站视频链接</translation>
+  <translation key="select_part">请选择分P</translation>
+  <translation key="download_all">下载全部</translation>
+  <translation key="download_specific">下载特定分P</translation>
+  <translation key="start_download">开始下载</translation>
+  <translation key="invalid_url">请输入有效的视频链接</translation>
+  <translation key="downloading">下载中</translation>
+  <translation key="downloading_video">正在下载视频...</translation>
+  <translation key="download_failed">下载失败</translation>
+  <translation key="download_complete">下载完成</translation>
+  <translation key="download_finished">视频下载完成!</translation>
+  <translation key="new_version">发现新版本</translation>
+  <translation key="found_version">发现新版本</translation>
+  <translation key="download_update">下载更新</translation>
+  <translation key="cancel">取消</translation>
+</translations>

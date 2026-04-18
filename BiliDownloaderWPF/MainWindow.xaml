@@ -1,0 +1,105 @@
+<Window x:Class="BiliDownloaderWPF.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:BiliDownloaderWPF"
+        mc:Ignorable="d"
+        Title="BiliDownloader GUI"
+        Height="500"
+        Width="600"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Background="#F0F0F0">
+    
+    <Window.Resources>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#0078D7"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#005A9E"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#E1E1E1"/>
+            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style x:Key="DangerButton" TargetType="Button">
+            <Setter Property="Background" Value="#E74C3C"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#C0392B"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Background="#0078D7" Padding="20" VerticalAlignment="Center">
+            <TextBlock Text="BiliDownloader By AnMo_C" FontSize="24" FontWeight="Bold" Foreground="White"/>
+            <TextBlock x:Name="VersionText" FontSize="14" Foreground="#E0E0E0" Margin="0,5,0,0"/>
+        </StackPanel>
+        
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Padding="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Announcement -->
+            <Border Grid.Row="0" Background="#E3F2FD" BorderBrush="#90CAF9" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                <TextBlock x:Name="AnnouncementText" Text="Loading announcement..." TextWrapping="Wrap"/>
+            </Border>
+            
+            <!-- Buttons -->
+            <WrapPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="500">
+                <Button Style="{StaticResource PrimaryButton}" Content="Login Bilibili" Click="LoginButton_Click" Width="200" Height="45"/>
+                <Button Style="{StaticResource PrimaryButton}" Content="Download Video" Click="DownloadButton_Click" Width="200" Height="45"/>
+                <Button Style="{StaticResource SecondaryButton}" Content="Changelog" Click="ChangelogButton_Click" Width="200" Height="45"/>
+                <Button Style="{StaticResource SecondaryButton}" Content="Help" Click="HelpButton_Click" Width="200" Height="45"/>
+                <Button Style="{StaticResource SecondaryButton}" Content="License" Click="LicenseButton_Click" Width="200" Height="45"/>
+                <Button Style="{StaticResource SecondaryButton}" Content="Donate" Click="DonateButton_Click" Width="200" Height="45"/>
+            </WrapPanel>
+        </Grid>
+        
+        <!-- Footer -->
+        <StackPanel Grid.Row="2" Background="#F8F8F8" Padding="20" Orientation="Horizontal" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+            <TextBlock Text="Language:" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <ComboBox x:Name="LanguageComboBox" Width="120" SelectionChanged="LanguageComboBox_SelectionChanged" VerticalAlignment="Center"/>
+            <Button Style="{StaticResource DangerButton}" Content="Exit" Click="ExitButton_Click" Width="120" Height="35" HorizontalAlignment="Right"/>
+        </StackPanel>
+    </Grid>
+</Window>
