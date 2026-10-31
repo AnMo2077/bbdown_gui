@@ -80,6 +80,7 @@ Windows 下的 B 站视频下载器：本地 Web UI（WinUI 3 Fluent 风格）�
 要求：Windows 10/11、Python 3.10+。
 
 ```bat
+py -m pip install -r requirements.txt
 py gui.py            :: 内置窗口
 py gui.py --browser  :: 默认浏览器
 py gui.py --serve    :: 仅启动本地服务
@@ -98,7 +99,7 @@ pwsh -File scripts/fetch-binaries.ps1
 pwsh -File scripts/fetch-binaries.ps1
 
 # 2. 安装构建依赖
-py -m pip install pyinstaller pillow
+py -m pip install -r requirements.txt pyinstaller pillow
 
 # 3. 构建
 py build_installer.py
@@ -157,6 +158,7 @@ docs/screenshots/          README 截图
   - FFmpeg shared build（gyan.dev）
   - aria2 1.37.0（aria2/aria2）
   - curl for Windows（curl.se）
+- Python 依赖：segno（二维码生成，打包进安装包）
 - 应用内「关于 → 开放源代码许可」列出了组件与许可证
 
 ## 免责声明

@@ -159,6 +159,8 @@ def build_app(icon, version_file):
         "tkinter.filedialog",
         "--hidden-import",
         "tkinter.ttk",
+        "--hidden-import",
+        "segno",
     ]
     if icon:
         cmd += ["--icon", str(icon)]
