@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BBDown 调试控制台</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { overflow: hidden; }
+    .debug-wrap { display: flex; flex-direction: column; gap: 10px; height: 100vh; padding: 16px 20px; }
+    .debug-head { display: flex; align-items: center; gap: 10px; }
+    .debug-head h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    .debug-status { margin-left: auto; font-size: 12px; color: var(--text-3); }
+    .debug-status.busy { color: var(--accent); }
+    .debug-log {
+      flex: 1;
+      margin: 0;
+      padding: 12px;
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      background: var(--log-bg);
+      color: var(--text-2);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.55;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .debug-row { display: flex; align-items: center; gap: 8px; }
+    .debug-prompt { color: var(--accent); font-family: var(--mono); }
+    .debug-input {
+      flex: 1;
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 6px;
+      border: 1px solid var(--stroke-2);
+      background: var(--input-bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+    }
+    .debug-input:focus { border-color: var(--accent); }
+    .debug-hint { font-size: 11.5px; color: var(--text-3); }
+    .debug-off { display: grid; place-items: center; height: 100vh; color: var(--text-2); font-size: 14px; padding: 24px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="debug-wrap" id="debug-wrap">
+    <div class="debug-head">
+      <h1>BBDown 调试控制台</h1>
+      <span class="badge">开发者模式</span>
+      <span class="debug-status" id="debug-status">连接中…</span>
+    </div>
+    <pre class="debug-log" id="debug-log"></pre>
+    <div class="debug-row">
+      <span class="debug-prompt">&gt;</span>
+      <input id="debug-input" class="debug-input" placeholder="输入 BBDown 参数，例如：ss1177 -info" autocomplete="off" spellcheck="false">
+      <button class="btn primary" id="debug-send">发送</button>
+      <button class="btn danger" id="debug-stop" disabled>停止</button>
+      <button class="btn ghost" id="debug-clear">清空</button>
+    </div>
+    <div class="debug-hint">只调用 BBDown.exe，不经过 shell；参数按 Windows 规则拆分，可用 ↑/↓ 翻历史。命令与输出同时记录在主窗口的调试日志中。</div>
+  </div>
+  <div class="debug-off" id="debug-off" hidden>调试模式未开启。请在主窗口「设置 → 开发者」中开启后重新打开本窗口。</div>
+  <script src="debug.js"></script>
+</body>
+</html>

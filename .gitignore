@@ -36,6 +36,7 @@ dist/
 # Environment
 .env
 .venv
+.build-venv/
 env/
 venv/
 env.bak/
@@ -50,6 +51,8 @@ venv.bak/
 # Specific to BiliDownloader
 BBDown.exe
 BBDown.data
+BBDown.data.bak-*
+BBDownTV.data
 aria2c.exe
 avcodec-61.dll
 avdevice-61.dll
@@ -74,6 +77,33 @@ Desktop.ini
 
 # Text files
 *.txt
+!requirements.txt
 
 # Logs
 *.log
+# Test artifacts
+.test-tmp/
+tests/_test_*
+tests/_smoke*
+tests/_probe*
+
+# 事故取证备份（损坏原件，勿提交）
+_forensics/
+
+# BBDown 子进程临时目录（System.CommandLine 哨兵文件）
+.bbdown-tmp/
+
+# CI 下载的第三方二进制缓存
+vendor/
+
+# 本地运行数据（含账号、历史、下载的视频）
+gui_config.json
+download_history.json
+BBDown.data
+Downloads/
+参考图/
+libcurl-x64.def
+
+# 安全审计报告仅本地保留
+安全审计报告-*.md
+

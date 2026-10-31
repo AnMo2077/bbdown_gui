@@ -1,34 +1,93 @@
-name: Build Windows Executable
+name: Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  test:
     runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile sources
+        run: python -m compileall -q app gui.py build_installer.py tests
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+  package:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install customtkinter pyinstaller requests
+      - name: Cache third-party binaries
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: binaries-${{ hashFiles('scripts/fetch-binaries.ps1') }}
+          restore-keys: binaries-
 
-    - name: Build with PyInstaller
-      run: |
-        pyinstaller --name BiliDownloader --add-data "lang;lang" --windowed --onefile gui.py
+      - name: Fetch BBDown / ffmpeg / aria2c / curl
+        shell: pwsh
+        run: ./scripts/fetch-binaries.ps1
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: BiliDownloader-exe
-        path: dist/BiliDownloader.exe
+      - name: Install build dependencies
+        run: python -m pip install --upgrade pip pyinstaller pillow
+
+      - name: Build installer
+        run: python build_installer.py
+
+      - name: Verify installer
+        shell: pwsh
+        run: |
+          Get-ChildItem dist
+          $setup = "dist/BiliDownloader-Setup-2.0.exe"
+          if (-not (Test-Path $setup)) { throw "安装包未生成: $setup" }
+          $info = (Get-Item $setup).VersionInfo
+          "Version: $($info.FileVersion) / $($info.ProductVersion)"
+          "Publisher: $($info.CompanyName)"
+          "SHA256: $((Get-FileHash $setup -Algorithm SHA256).Hash)"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: BiliDownloader-Setup
+          path: dist/BiliDownloader-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/BiliDownloader-Setup-*.exe
+          generate_release_notes: true

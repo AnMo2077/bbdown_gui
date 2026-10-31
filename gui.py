@@ -1,264 +1,444 @@
-import tkinter as tk
-from tkinter import messagebox
-import requests
-import webbrowser
+#!/usr/bin/env python3
+"""BiliDownloader - 本地 Web UI 启动器。
+
+界面位于 app/webui（HTML/CSS/JS，WinUI 3 Fluent 风格），
+Python 只负责业务逻辑（BBDown 封装、配置、远程公告）与本地 HTTP 服务。
+
+窗口宿主优先使用系统自带 Edge 的 App 模式（无地址栏，独立窗口），
+找不到 Edge 时回退默认浏览器。
+
+用法：
+    py gui.py            # Edge App 窗口
+    py gui.py --browser  # 强制使用默认浏览器
+    py gui.py --serve    # 只启动本地服务（调试 / 自动化）
+"""
+import argparse
 import os
+import shutil
+import subprocess
+import sys
+import time
+import traceback
+import webbrowser
 
-class BiliDownloaderGUI:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("BiliDownloader GUI")
-        self.version = "1.1"
-        self.setup_ui()
-        self.fetch_remote_data()
+# 确保脚本目录在 sys.path 中（源码运行与 PyInstaller 打包后都可用）
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-    def setup_ui(self):
-        # 主界面布局
-        self.main_frame = tk.Frame(self.root)
-        self.main_frame.pack(padx=20, pady=20)
-        
-        # 标题和版本信息
-        tk.Label(self.main_frame, text="BiliDownloader By AnMo_C", font=("Arial", 16)).grid(row=0, column=0, columnspan=2, pady=10)
-        tk.Label(self.main_frame, text=f"版本: {self.version}").grid(row=1, column=0, columnspan=2)
-        
-        # 公告区域
-        self.ad_label = tk.Label(self.main_frame, text="正在获取公告...", wraplength=300)
-        self.ad_label.grid(row=2, column=0, columnspan=2, pady=10)
-        
-        # 功能按钮
-        tk.Button(self.main_frame, text="登录B站账号", command=self.login).grid(row=3, column=0, pady=5, sticky="ew")
-        tk.Button(self.main_frame, text="下载视频", command=self.download).grid(row=3, column=1, pady=5, sticky="ew")
-        tk.Button(self.main_frame, text="更新日志", command=self.show_log).grid(row=4, column=0, pady=5, sticky="ew")
-        tk.Button(self.main_frame, text="使用帮助", command=self.show_help).grid(row=4, column=1, pady=5, sticky="ew")
-        tk.Button(self.main_frame, text="开放源代码许可", command=self.show_license).grid(row=5, column=0, pady=5, sticky="ew")
-        tk.Button(self.main_frame, text="捐赠", command=self.donate).grid(row=5, column=1, pady=5, sticky="ew")
-        tk.Button(self.main_frame, text="退出", command=self.root.quit).grid(row=7, column=0, pady=5, sticky="ew")
+# PyInstaller 安装版：数据目录固定为 exe 所在目录
+if getattr(sys, "frozen", False):
+    os.environ.setdefault("BILIDOWNLOADER_HOME", os.path.dirname(os.path.abspath(sys.executable)))
 
-    def fetch_remote_data(self):
-        try:
-            response = requests.get("https://api.anmoc.top/bilidown.txt")
-            if response.status_code == 200:
-                response.encoding = 'gbk'
-                data = response.text
-                # 解析远程数据
-                self.ad = self.parse_value(data, "ad=")
-                self.log = self.parse_value(data, "log=")
-                self.prog_ver = self.parse_value(data, "prog_ver=")
-                self.url = self.parse_value(data, "url=")
-                
-                # 更新UI
-                self.ad_label.config(text=self.ad)
-                
-                # 检查版本
-                if self.version != self.prog_ver:
-                    self.show_update_message()
-            else:
-                self.ad_label.config(text="网络异常获取公告失败请检查网络后重试")
-                
-            # 检查核心文件是否存在
-            # 检查核心文件是否存在
-            bbd_path = os.path.join(os.path.dirname(__file__), "BBDown.exe")
-            curl_path = os.path.join(os.path.dirname(__file__), "curl.exe")
-            if not os.path.exists(bbd_path) or not os.path.exists(curl_path):
-                messagebox.showerror("错误", f"缺少必要文件:\nBBDown.exe路径: {bbd_path}\ncurl.exe路径: {curl_path}\n请确保文件放在程序目录下")
-                self.root.quit()
-        except Exception as e:
-            self.ad_label.config(text=f"获取远程数据失败: {str(e)}")
-    
-    def parse_value(self, data, key):
-        lines = data.splitlines()
-        for line in lines:
-            if line.startswith(key):
-                return line[len(key):].strip()
-        return ""
-    
-    def show_update_message(self):
-        update_window = tk.Toplevel(self.root)
-        update_window.title("发现新版本")
-        update_window.grab_set()  # 设置为模态窗口
-        update_window.transient(self.root)  # 设置为主窗口的子窗口
-        
-        tk.Label(update_window, text=f"发现新版本 {self.prog_ver}", font=("Arial", 12)).pack(pady=10)
-        tk.Label(update_window, text=f"更新日志: {self.log}", wraplength=300).pack(pady=5)
-        tk.Button(update_window, text="下载更新", command=lambda: [webbrowser.open(self.url), self.root.quit()]).pack(pady=10)
-        tk.Button(update_window, text="取消", command=self.root.quit).pack(pady=5)
-    
-    def login(self):
-        # 实现登录功能
-        try:
-            # 调用BBDown.exe执行登录命令
-            bbd_path = os.path.join(os.path.dirname(__file__), "BBDown.exe")
-            if not os.path.exists(bbd_path):
-                messagebox.showerror("错误", "找不到BBDown.exe，请确保文件放在程序目录下")
-                return
-            
-            # 执行登录命令(异步)
-            import subprocess
-            import threading
-            
-            def async_login():
-                try:
-                    # 设置工作目录为程序所在目录
-                    os.chdir(os.path.dirname(__file__))
-                    process = subprocess.Popen([bbd_path, "login"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    process.wait()
-                    
-                    # 检查并打开二维码图片
-                    qrcode_path = os.path.join(os.path.dirname(__file__), "qrcode.png")
-                    abs_path = os.path.abspath(qrcode_path)
-                    
-                    # 确保二维码文件已生成
-                    if os.path.exists(abs_path):
-                        # 使用系统默认程序打开文件
-                        try:
-                            os.startfile(abs_path)
-                            self.root.after(0, lambda: messagebox.showinfo("登录", "请扫描二维码登录B站账号"))
-                        except Exception as e:
-                            print(f"系统打开失败: {str(e)}")
-                            try:
-                                webbrowser.open(abs_path)
-                                self.root.after(0, lambda: messagebox.showinfo("登录", "请扫描二维码登录B站账号"))
-                            except Exception as e:
-                                print(f"备用方法失败: {str(e)}")
-                                self.root.after(0, lambda: messagebox.showerror("错误", f"无法打开二维码文件: {abs_path}"))
-                    else:
-                        self.root.after(0, lambda: messagebox.showerror("错误", "二维码文件生成失败，请重试"))
-                except Exception as e:
-                    self.root.after(0, lambda: messagebox.showerror("错误", f"登录过程中发生错误: {str(e)}"))
-            
-            # 启动异步登录线程
-            threading.Thread(target=async_login, daemon=True).start()
-        except subprocess.CalledProcessError:
-            messagebox.showerror("错误", "登录命令执行失败")
-        except Exception as e:
-            messagebox.showerror("错误", f"登录过程中发生错误: {str(e)}")
-    
-    def download(self):
-        # 创建下载窗口
-        download_window = tk.Toplevel(self.root)
-        download_window.title("下载视频")
-        download_window.geometry("400x300")
-        
-        # 添加输入框
-        tk.Label(download_window, text="请输入B站视频链接:").pack(pady=10)
-        self.video_url = tk.StringVar()
-        url_entry = tk.Entry(download_window, textvariable=self.video_url, width=40)
-        
-        # 添加右键菜单
-        menu = tk.Menu(url_entry, tearoff=0)
-        menu.add_command(label="粘贴", command=lambda: url_entry.event_generate('<<Paste>>'))
-        url_entry.bind("<Button-3>", lambda e: menu.post(e.x_root, e.y_root))
-        
-        url_entry.pack()
-        
-        # 添加分P选择
-        tk.Label(download_window, text="请选择分P:").pack(pady=5)
-        self.part_selection = tk.StringVar(value="all")
-        tk.Radiobutton(download_window, text="下载全部", variable=self.part_selection, value="all").pack(anchor="w")
-        tk.Radiobutton(download_window, text="下载特定分P", variable=self.part_selection, value="specific").pack(anchor="w")
-        
-        # 添加分P范围输入
-        self.start_p_frame = tk.Frame(download_window)
-        self.start_p_frame.pack(anchor="w")
-        tk.Label(self.start_p_frame, text="起始P:").pack(side="left")
-        self.start_p = tk.StringVar()
-        tk.Entry(self.start_p_frame, textvariable=self.start_p, width=5).pack(side="left")
-        
-        self.end_p_frame = tk.Frame(download_window)
-        self.end_p_frame.pack(anchor="w")
-        tk.Label(self.end_p_frame, text="结束P:").pack(side="left")
-        self.end_p = tk.StringVar()
-        tk.Entry(self.end_p_frame, textvariable=self.end_p, width=5).pack(side="left")
-        
-        # 添加确认按钮
-        tk.Button(download_window, text="下载", command=self.start_download).pack(pady=15, side="bottom", anchor="center")
-        
-    def close_all_child_windows(self):
-        """关闭所有子窗口，仅保留主窗口"""
-        for child in self.root.winfo_children():
-            if isinstance(child, tk.Toplevel):
-                child.destroy()
-                
-    def start_download(self):
-        # 获取视频链接并开始下载
-        url = self.video_url.get()
-        if url:
+from app.server import AppServer  # noqa: E402
+
+
+def app_dir():
+    """程序所在目录：打包后为 exe 目录，源码运行为项目根目录。"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+LOG_PATH = os.path.join(app_dir(), "BiliDownloader.log")
+
+
+def log(message):
+    """写启动日志（窗口模式下没有控制台，便于用户反馈问题）。"""
+    try:
+        with open(LOG_PATH, "a", encoding="utf-8") as handle:
+            handle.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
+    except OSError:
+        pass
+
+
+def say(message):
+    """窗口模式（PyInstaller --windowed）下 sys.stdout 为 None，不能直接 print。"""
+    if sys.stdout is None:
+        return
+    try:
+        print(message, flush=True)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def report_error(exc):
+    log("FATAL: " + "".join(traceback.format_exception(exc)))
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(
+            "BiliDownloader",
+            f"程序遇到错误：\n{exc}\n\n详细信息已写入：\n{LOG_PATH}",
+        )
+        root.destroy()
+    except Exception:  # noqa: BLE001 - GUI 弹窗失败时至少保留日志
+        pass
+
+
+def show_fallback_notice():
+    """没有可用的 Edge/WebView2 窗口环境时提示用户改用浏览器。"""
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        messagebox.showinfo(
+            "BiliDownloader",
+            "未检测到可用的 Microsoft Edge / WebView2 窗口环境。\n"
+            "将自动使用系统默认浏览器打开界面。",
+            parent=root,
+        )
+        root.destroy()
+    except Exception:  # noqa: BLE001 - 提示失败时静默回退
+        pass
+
+
+def show_browser_error(url):
+    """连默认浏览器也无法启动时给出兜底提示。"""
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        messagebox.showerror(
+            "BiliDownloader",
+            f"无法自动打开默认浏览器。\n请手动访问：\n{url}",
+            parent=root,
+        )
+        root.destroy()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def find_edge():
+    """查找系统自带 Microsoft Edge。"""
+    candidates = [
+        os.path.join(
+            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+            "Microsoft", "Edge", "Application", "msedge.exe",
+        ),
+        os.path.join(
+            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+            "Microsoft", "Edge", "Application", "msedge.exe",
+        ),
+        os.path.join(
+            os.environ.get("LOCALAPPDATA", ""),
+            "Microsoft", "Edge", "Application", "msedge.exe",
+        ),
+    ]
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+    try:
+        import winreg
+
+        for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
             try:
-                # 调用BBDown.exe下载视频
-                bbd_path = os.path.join(os.path.dirname(__file__), "BBDown.exe")
-                if not os.path.exists(bbd_path):
-                    messagebox.showerror("错误", "找不到BBDown.exe，请确保文件放在程序目录下")
-                    return
-                
-                # 根据选择构建命令
-                command = [bbd_path, url, "-aria2"]
-                if self.part_selection.get() == "specific":
-                    if self.start_p.get() and self.end_p.get():
-                        command.extend(["-p", f"{self.start_p.get()}-{self.end_p.get()}"])
-                    else:
-                        part_num = simpledialog.askinteger("分P选择", "请输入要下载的分P编号:")
-                        if part_num:
-                            command.extend(["-p", str(part_num)])
-                
-                # 创建下载进度窗口
-                progress_window = tk.Toplevel(self.root)
-                progress_window.title("下载进度")
-                progress_window.geometry("400x100")
-                
-                tk.Label(progress_window, text="正在下载视频...").pack(pady=10)
-                progress = tk.Label(progress_window, text="0%")
-                progress.pack()
-                
-                # 启动下载进程
-                import subprocess
-                process = subprocess.Popen(command, 
-                                         stdout=subprocess.PIPE, 
-                                         stderr=subprocess.PIPE,
-                                         universal_newlines=True)
-                
-                # 更新进度
-                def update_progress():
-                    output = process.stdout.readline()
-                    if "%" in output:
-                        progress.config(text=output.strip())
-                    if process.poll() is None:
-                        progress_window.after(100, update_progress)
-                    else:
-                        progress_window.destroy()
-                        confirm_window = tk.Toplevel(self.root)
-                        confirm_window.title("下载完成")
-                        confirm_window.geometry("300x100")
-                        tk.Label(confirm_window, text="视频下载完成！").pack(pady=10)
-                        tk.Button(confirm_window, text="确定", command=lambda: [confirm_window.destroy(), self.close_all_child_windows()]).pack(pady=10)
-                
-                progress_window.after(100, update_progress)
-                
-            except Exception as e:
-                messagebox.showerror("错误", f"下载失败: {str(e)}")
+                key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"
+                with winreg.OpenKey(root, key_path) as key:
+                    path, _ = winreg.QueryValueEx(key, "")
+                if path and os.path.isfile(path):
+                    return path
+            except OSError:
+                continue
+    except ImportError:
+        pass
+    return ""
+
+
+def run_edge_app(url, server):
+    """用 Edge 的 App 模式打开独立窗口，等待窗口关闭或前端请求退出。"""
+    edge = find_edge()
+    if not edge:
+        log("未找到 Microsoft Edge，改用默认浏览器")
+        return False
+
+    # 每次使用独立的临时配置目录，避免残留进程导致 “profile in use”
+    profile = os.path.join(
+        os.environ.get("LOCALAPPDATA", app_dir()),
+        "BiliDownloader",
+        "profiles",
+        f"{os.getpid()}-{int(time.time())}",
+    )
+    try:
+        os.makedirs(profile, exist_ok=True)
+    except OSError:
+        profile = os.path.join(app_dir(), ".browser", str(os.getpid()))
+        os.makedirs(profile, exist_ok=True)
+
+    arguments = [
+        edge,
+        f"--app={url}",
+        "--window-size=1120,760",
+        f"--user-data-dir={profile}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-background-mode",
+        "--disable-sync",
+        # 关闭硬件加速：老显卡/远程桌面下更稳定，界面动画仍由软件合成
+        "--disable-gpu",
+        "--disable-features=msEdgeSidebarV2,msEdgeCollections",
+    ]
+    if getattr(sys, "frozen", False):
+        # PyInstaller 的 Job 对象与 Chromium 沙箱不兼容，打包版需关闭沙箱；
+        # 该窗口只加载 127.0.0.1 本地页面，不用于浏览外部网站。
+        arguments.append("--no-sandbox")
+        # 抑制 Chromium 对 --no-sandbox 的“不受支持命令行标记”提示条
+        arguments.append("--test-type")
+    try:
+        process = subprocess.Popen(arguments)
+    except OSError as exc:
+        log(f"Edge 启动失败，改用默认浏览器: {exc}")
+        return False
+
+    log(f"Edge App 窗口已启动 pid={process.pid}")
+    time.sleep(1.2)
+    if process.poll() is not None:
+        log(f"Edge App 进程提前退出 (code={process.returncode})，改用默认浏览器")
+        shutil.rmtree(profile, ignore_errors=True)
+        return False
+
+    try:
+        while process.poll() is None:
+            if server.quit_requested:
+                log("收到退出请求，正在关闭 Edge 窗口")
+                try:
+                    process.terminate()
+                except OSError:
+                    pass
+                break
+            time.sleep(0.25)
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except OSError:
+                pass
+    except KeyboardInterrupt:
+        try:
+            process.terminate()
+        except OSError:
+            pass
+    finally:
+        shutil.rmtree(profile, ignore_errors=True)
+    log("Edge App 窗口已关闭")
+    return True
+
+
+def dialog_icon():
+    """优先取打包内 app.ico，源码运行时回退到 build/app.ico。"""
+    candidates = []
+    if getattr(sys, "_MEIPASS", None):
+        candidates.append(os.path.join(sys._MEIPASS, "app.ico"))
+    candidates.append(os.path.join(app_dir(), "app.ico"))
+    candidates.append(os.path.join(app_dir(), "build", "app.ico"))
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return ""
+
+
+def ask_window_mode(server):
+    """安装版首次启动时选择默认窗口方式。"""
+    try:
+        import tkinter as tk
+    except Exception:  # noqa: BLE001
+        return "edge"
+
+    choice = {"value": "edge"}
+    root = tk.Tk()
+    root.title("BiliDownloader")
+    root.resizable(False, False)
+    root.attributes("-topmost", True)
+    icon = dialog_icon()
+    if icon:
+        try:
+            root.iconbitmap(icon)
+        except tk.TclError:
+            pass
+
+    tk.Label(root, text="欢迎使用 BiliDownloader", font=("Segoe UI", 16, "bold")).pack(
+        anchor="w", padx=24, pady=(22, 4)
+    )
+    tk.Label(
+        root,
+        text="首次启动，请选择界面打开方式（之后可在设置中更改）：",
+        foreground="#555555",
+    ).pack(anchor="w", padx=24)
+    var = tk.StringVar(value="edge")
+    tk.Radiobutton(
+        root, text="内置窗口（WebView / Edge，推荐）", variable=var, value="edge"
+    ).pack(anchor="w", padx=24, pady=(14, 2))
+    tk.Radiobutton(root, text="默认浏览器", variable=var, value="browser").pack(
+        anchor="w", padx=24
+    )
+
+    def confirm():
+        choice["value"] = var.get()
+        try:
+            server.config.set("window_mode", choice["value"])
+            server.config.save()
+        except Exception:  # noqa: BLE001
+            pass
+        root.destroy()
+
+    ok_button = tk.Button(root, text="确定", width=12, command=confirm)
+    ok_button.pack(anchor="e", padx=24, pady=(18, 0))
+    ok_button.focus_set()
+    root.bind("<Return>", lambda event: confirm())
+    root.protocol("WM_DELETE_WINDOW", confirm)
+    root.update_idletasks()
+    width, height = 480, 268
+    x = max(0, (root.winfo_screenwidth() - width) // 2)
+    y = max(0, (root.winfo_screenheight() - height) // 2)
+    root.geometry(f"{width}x{height}+{x}+{y}")
+    root.mainloop()
+    return choice["value"]
+
+
+def open_default_browser(url, server):
+    opened = webbrowser.open(url)
+    if opened is False:
+        log("无法打开默认浏览器")
+        show_browser_error(url)
+        say("无法自动打开浏览器")
+        return
+    log("已在默认浏览器打开界面")
+    say("已在默认浏览器打开界面；按 Ctrl+C 结束服务。")
+    while not server.quit_requested:
+        time.sleep(0.3)
+
+
+def webview2_runtime_installed():
+    """检测 WebView2 Evergreen 运行时是否安装。"""
+    bases = [
+        os.environ.get("PROGRAMFILES(X86)"),
+        os.environ.get("PROGRAMFILES"),
+        os.environ.get("LOCALAPPDATA"),
+    ]
+    for base in bases:
+        if not base:
+            continue
+        application = os.path.join(base, "Microsoft", "EdgeWebView", "Application")
+        try:
+            versions = os.listdir(application)
+        except OSError:
+            continue
+        for version in versions:
+            if os.path.isfile(os.path.join(application, version, "msedgewebview2.exe")):
+                return True
+    return False
+
+
+WEBVIEW2_URL = "https://developer.microsoft.com/microsoft-edge/webview2/"
+
+
+def ask_webview_fallback():
+    """内置窗口不可用时，让用户选择下载 WebView2 或改用浏览器。"""
+    try:
+        import tkinter as tk
+    except Exception:  # noqa: BLE001
+        return "browser"
+
+    choice = {"value": "browser"}
+    root = tk.Tk()
+    root.title("BiliDownloader")
+    root.resizable(False, False)
+    root.attributes("-topmost", True)
+    icon = dialog_icon()
+    if icon:
+        try:
+            root.iconbitmap(icon)
+        except tk.TclError:
+            pass
+
+    tk.Label(root, text="未检测到可用的 WebView", font=("Segoe UI", 15, "bold")).pack(
+        anchor="w", padx=24, pady=(20, 6)
+    )
+    detail = "内置窗口需要 Microsoft Edge 或 WebView2 运行时。"
+    if webview2_runtime_installed():
+        detail = "已检测到 WebView2 运行时，但未找到 Microsoft Edge 浏览器。"
+    tk.Label(root, text=detail, foreground="#555555").pack(anchor="w", padx=24)
+    tk.Label(
+        root,
+        text="可以下载 WebView2 后重试，或本次改用默认浏览器打开界面。",
+        foreground="#555555",
+    ).pack(anchor="w", padx=24, pady=(4, 0))
+
+    def choose(value):
+        choice["value"] = value
+        root.destroy()
+
+    row = tk.Frame(root)
+    row.pack(anchor="e", padx=24, pady=(22, 0))
+    tk.Button(row, text="退出", width=8, command=lambda: choose("quit")).pack(side="left", padx=(0, 8))
+    tk.Button(row, text="使用默认浏览器", width=14, command=lambda: choose("browser")).pack(side="left", padx=(0, 8))
+    tk.Button(row, text="下载 WebView2", width=14, command=lambda: choose("download")).pack(side="left")
+    root.protocol("WM_DELETE_WINDOW", lambda: choose("quit"))
+    root.update_idletasks()
+    width, height = 520, 270
+    x = max(0, (root.winfo_screenwidth() - width) // 2)
+    y = max(0, (root.winfo_screenheight() - height) // 2)
+    root.geometry(f"{width}x{height}+{x}+{y}")
+    root.mainloop()
+    return choice["value"]
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="BiliDownloader")
+    parser.add_argument("--browser", action="store_true", help="强制使用默认浏览器")
+    parser.add_argument("--serve", action="store_true", help="只启动本地服务，不打开窗口")
+    parser.add_argument("--port", type=int, default=0, help="本地服务端口（默认随机）")
+    args = parser.parse_args(argv)
+
+    log(f"启动 (frozen={getattr(sys, 'frozen', False)}, dir={app_dir()})")
+    server = AppServer()
+    server.start(args.port)
+    url = server.url
+    log(f"本地服务: {url}")
+    say(f"BiliDownloader UI: {url}")
+
+    mode = str(server.config.get("window_mode") or "").strip().lower()
+    if mode not in ("edge", "browser"):
+        if getattr(sys, "frozen", False) and not args.browser and not args.serve:
+            mode = ask_window_mode(server)
         else:
-            messagebox.showerror("错误", "请输入有效的视频链接")
-    
-    def show_log(self):
-        # 显示更新日志
-        log_window = tk.Toplevel(self.root)
-        log_window.title("更新日志")
-        
-        tk.Label(log_window, text=self.log, wraplength=300).pack(padx=20, pady=20)
-        tk.Button(log_window, text="关闭", command=log_window.destroy).pack(pady=10)
-        
-    def show_license(self):
-        # 显示开源许可
-        webbrowser.open("https://api.anmoc.top/bilidownlicense.txt")
-        
-    def show_help(self):
-        # 显示使用帮助
-        webbrowser.open("https://api.anmoc.top/bilidownhelp.txt")
-        
-    def donate(self):
-        # 打开捐赠页面
-        webbrowser.open("https://anmoc.top/eat")
+            mode = "edge"
+
+    try:
+        if args.serve:
+            while not server.quit_requested:
+                time.sleep(0.3)
+        elif args.browser or mode == "browser":
+            open_default_browser(url, server)
+        elif not find_edge():
+            choice = ask_webview_fallback()
+            if choice == "download":
+                log("未检测到 WebView，打开 WebView2 下载页")
+                webbrowser.open(WEBVIEW2_URL)
+                say("已打开 WebView2 下载页；本次使用默认浏览器。")
+            if choice in ("download", "browser"):
+                open_default_browser(url, server)
+        elif not run_edge_app(url, server):
+            show_fallback_notice()
+            open_default_browser(url, server)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.stop()
+        log("服务已停止")
+
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = BiliDownloaderGUI(root)
-    root.mainloop()
+    try:
+        main()
+    except Exception as error:  # noqa: BLE001 - 窗口模式下的最后一道兜底
+        report_error(error)
+        sys.exit(1)

@@ -1,0 +1,2 @@
+# 运行时无第三方依赖（仅 Python 标准库）。
+# 打包安装程序时额外需要：pip install pyinstaller pillow

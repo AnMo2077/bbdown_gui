@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0a84d0">
+  <meta name="color-scheme" content="light dark">
+  <title>BiliDownloader</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="splash" id="splash">
+    <div class="splash-inner">
+      <div class="splash-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="30" height="30"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+      </div>
+      <div class="splash-title">BiliDownloader</div>
+      <div class="splash-status" id="splash-status">正在连接本地服务…</div>
+      <div class="splash-bar"><span></span></div>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">BiliDownloader</div>
+          <div class="brand-sub" id="brand-sub">v2.0 · By AnMo_C</div>
+        </div>
+        <button class="sidebar-toggle" id="sidebar-toggle" title="收起侧栏" aria-label="收起侧栏" aria-expanded="true">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <nav class="nav" aria-label="主导航">
+        <span class="nav-indicator" id="nav-indicator" hidden></span>
+        <button class="nav-item active" data-page="home">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 10v10h6v-6h6v6h6V10z"/></svg>
+          <span>首页</span>
+        </button>
+        <button class="nav-item" data-page="download">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10l3.5-3.5 1.4 1.4L12 17l-5.9-6.1 1.4-1.4L11 13z"/><path d="M4 19h16v2H4z"/></svg>
+          <span>下载</span>
+        </button>
+        <button class="nav-item" data-page="login">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z"/></svg>
+          <span>登录</span>
+        </button>
+        <button class="nav-item" data-page="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4c0-.6-.1-1.2-.2-1.7l2-1.5-2-3.5-2.3 1a8 8 0 0 0-1.5-.9L16.5 3h-4l-.5 2.4c-.5.2-1 .5-1.5.9l-2.3-1-2 3.5 2 1.5a8 8 0 0 0 0 3.4l-2 1.5 2 3.5 2.3-1c.5.4 1 .7 1.5.9l.5 2.4h4l.5-2.4c.5-.2 1-.5 1.5-.9l2.3 1 2-3.5-2-1.5c.1-.5.2-1.1.2-1.7z"/></svg>
+          <span>设置</span>
+        </button>
+        <button class="nav-item" data-page="about">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          <span>关于</span>
+        </button>
+      </nav>
+
+      <div class="side-bottom">
+        <div class="side-label">外观</div>
+        <select id="appearance-mode" class="side-select">
+          <option value="System">跟随系统</option>
+          <option value="Light">浅色</option>
+          <option value="Dark">深色</option>
+        </select>
+
+        <div class="side-label spaced">核心文件</div>
+        <ul class="core-list" id="core-list"></ul>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="page-head">
+        <h1 id="page-title">BiliDownloader</h1>
+        <p class="page-sub" id="page-sub">By AnMo_C · v2.0</p>
+      </header>
+
+      <div class="pages">
+        <!-- 首页 -->
+        <section class="page active" id="page-home">
+          <div class="card">
+            <h2>公告</h2>
+            <p class="card-text" id="announce-ad">正在获取公告…</p>
+            <p class="card-note" id="announce-note" hidden></p>
+          </div>
+
+          <div class="card">
+            <h2>版本检查</h2>
+            <p class="card-text" id="update-text">正在检查版本…</p>
+            <div class="log-toggle" id="update-log-wrap" hidden>
+              <button class="link" id="update-log-toggle" aria-expanded="false">
+                <span class="chevron">›</span> 展开查看更新日志
+              </button>
+              <pre class="log-box" id="update-log" hidden></pre>
+            </div>
+            <button class="btn primary mt" id="update-download" hidden>下载更新</button>
+          </div>
+
+          <div class="card">
+            <h2>快捷操作</h2>
+            <div class="row">
+              <button class="btn primary" id="quick-download">去下载</button>
+              <button class="btn" id="quick-login">去登录</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>核心文件状态</h2>
+            <ul class="core-list roomy" id="core-files-card"></ul>
+          </div>
+        </section>
+
+        <!-- 下载 -->
+        <section class="page" id="page-download">
+          <div class="card">
+            <h2>视频地址</h2>
+            <div class="row">
+              <input id="url-input" class="input grow" placeholder="https://www.bilibili.com/video/BV… 或 ep / ss / BV 号" spellcheck="false" autocomplete="off">
+              <button class="btn" id="paste-button">粘贴</button>
+              <button class="btn ghost" id="clear-url">清空</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>下载选项</h2>
+            <div class="grid two">
+              <label class="field">
+                <span>分 P 范围</span>
+                <select id="part-mode" class="input">
+                  <option value="all">全部分 P</option>
+                  <option value="specific">指定分 P / 范围</option>
+                  <option value="last">仅最后一个分 P</option>
+                </select>
+              </label>
+              <label class="field" id="page-range-field" hidden>
+                <span>分 P 编号</span>
+                <input id="page-range" class="input" placeholder="如 1,3-5 或 8" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>清晰度</span>
+                <select id="quality-select" class="input">
+                  <option value="">跟随全局设置</option>
+                  <option value="8K 超高清">8K 超高清</option>
+                  <option value="4K 超高清">4K 超高清</option>
+                  <option value="1080P 高码率">1080P 高码率</option>
+                  <option value="1080P 高清">1080P 高清</option>
+                  <option value="720P 高清">720P 高清</option>
+                  <option value="480P 清晰">480P 清晰</option>
+                  <option value="360P 流畅">360P 流畅</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>视频编码优先级</span>
+                <select id="encoding-select" class="input">
+                  <option value="hevc,avc,av1">HEVC → AVC → AV1</option>
+                  <option value="avc,hevc,av1">AVC → HEVC → AV1</option>
+                  <option value="av1,hevc,avc">AV1 → HEVC → AVC</option>
+                </select>
+              </label>
+            </div>
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="video-only-switch"><span>仅下载视频</span></label>
+              <label class="check"><input type="checkbox" id="audio-only-switch"><span>仅下载音频</span></label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>进度</h2>
+              <div class="row tight">
+                <button class="btn" id="open-output" hidden>打开文件所在位置</button>
+                <button class="btn primary" id="start-button">开始下载</button>
+                <button class="btn danger" id="stop-button" disabled>停止</button>
+              </div>
+            </div>
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress">
+              <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="progress-text" id="progress-text">等待开始</div>
+            <div class="log-head">
+              <span>运行日志</span>
+              <button class="link" id="clear-log">清空</button>
+            </div>
+            <pre class="log" id="log-output"></pre>
+          </div>
+        </section>
+
+        <!-- 登录 -->
+        <section class="page" id="page-login">
+          <div class="card login-card">
+            <div class="qr-box">
+              <div class="member-card" id="qr-status" hidden>
+                <div class="member-icon" id="qr-status-icon"></div>
+                <div class="member-title" id="qr-status-badge">已登录</div>
+                <div class="member-sub" id="qr-status-sub"></div>
+                <div class="member-uid" id="qr-status-uid"></div>
+              </div>
+              <img id="login-qr" alt="登录二维码" hidden>
+              <div class="qr-placeholder" id="qr-placeholder">点击右侧“获取二维码”</div>
+            </div>
+            <div class="login-info">
+              <h2>扫码登录</h2>
+              <p class="card-note">使用 B 站手机客户端扫码。登录后可下载 1080P 高码率、大会员与部分受限内容。</p>
+              <p class="login-status" id="login-status">未登录</p>
+              <div class="row wrap">
+                <button class="btn primary" id="login-refresh">获取二维码</button>
+                <button class="btn" id="login-check">检测登录状态</button>
+                <button class="btn ghost" id="login-logout">退出登录</button>
+              </div>
+              <p class="card-note" id="login-message"></p>
+              <div class="quality-list" id="login-check-qualities" hidden></div>
+              <pre class="log-box check-result" id="login-check-result" hidden></pre>
+              <p class="card-note" id="login-log-hint" hidden>完整日志已隐藏，可在「设置 → 日志」中切换为“详细”。</p>
+            </div>
+          </div>
+          <div class="card">
+            <h2>说明</h2>
+            <ul class="tips">
+              <li>登录凭证保存在程序目录的 <code>BBDown.data</code>，只在本机使用。</li>
+              <li>二维码 3 分钟内有效，过期后重新获取即可。</li>
+              <li>公共电脑上使用完请点击“退出登录”。</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 设置 -->
+        <section class="page" id="page-settings">
+          <div class="settings-layout">
+            <aside class="settings-nav" id="settings-nav" aria-label="设置分类">
+              <span class="settings-nav-indicator" id="settings-nav-indicator" hidden></span>
+              <button class="settings-nav-item active" data-target="settings-paths">路径</button>
+              <button class="settings-nav-item" data-target="settings-download">下载</button>
+              <button class="settings-nav-item" data-target="settings-network">接口与网络</button>
+              <button class="settings-nav-item" data-target="settings-credentials">凭证</button>
+              <button class="settings-nav-item" data-target="settings-developer">开发者</button>
+              <button class="settings-nav-item" data-target="settings-log">日志</button>
+              <button class="settings-nav-item" data-target="settings-appearance">外观</button>
+            </aside>
+
+            <div class="settings-content">
+          <div class="card" id="settings-paths">
+            <h2>路径</h2>
+            <label class="field wide">
+              <span>下载目录</span>
+              <div class="row tight">
+                <input id="work-dir" class="input grow" placeholder="默认：程序目录下的 Downloads">
+                <button class="btn" id="pick-work-dir">选择</button>
+                <button class="btn ghost" id="open-work-dir">打开</button>
+              </div>
+            </label>
+            <label class="field wide">
+              <span>ffmpeg.exe</span>
+              <div class="row tight">
+                <input id="ffmpeg-path" class="input grow" placeholder="默认：程序目录下的 ffmpeg.exe">
+                <button class="btn" id="pick-ffmpeg">选择</button>
+              </div>
+            </label>
+            <label class="field wide">
+              <span>aria2c.exe</span>
+              <div class="row tight">
+                <input id="aria2c-path" class="input grow" placeholder="默认：程序目录下的 aria2c.exe">
+                <button class="btn" id="pick-aria2c">选择</button>
+              </div>
+            </label>
+            <label class="field wide">
+              <span>下载完成后移动到</span>
+              <div class="row tight">
+                <input id="output-dir" class="input grow" placeholder="默认：程序目录下的 Downloads">
+                <button class="btn" id="pick-output-dir">选择</button>
+              </div>
+            </label>
+          </div>
+
+          <div class="card" id="settings-download">
+            <h2>下载</h2>
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="use-aria2c"><span>使用 aria2c 多线程下载</span></label>
+              <label class="check"><input type="checkbox" id="multi-thread"><span>BBDown 内置多线程</span></label>
+              <label class="check"><input type="checkbox" id="save-archives"><span>记录已下载视频，避免重复下载</span></label>
+              <label class="check"><input type="checkbox" id="force-http"><span>下载分片强制使用 HTTP</span></label>
+              <label class="check"><input type="checkbox" id="allow-pcdn"><span>允许 PCDN 域名</span></label>
+            </div>
+            <div class="grid two mt">
+              <label class="field">
+                <span>aria2c 参数</span>
+                <input id="aria2c-args" class="input" placeholder="-x16 -s16 -j16 -k5M">
+              </label>
+              <label class="field">
+                <span>分 P 间隔（秒）</span>
+                <input id="delay-per-page" class="input" placeholder="0">
+              </label>
+              <label class="field">
+                <span>清晰度优先级</span>
+                <input id="dfn-priority" class="input" placeholder="如 8K 超高清, 1080P 高码率">
+              </label>
+              <label class="field">
+                <span>单 P 文件名模板</span>
+                <input id="file-pattern" class="input" placeholder="默认 &lt;videoTitle&gt;">
+              </label>
+              <label class="field wide">
+                <span>多 P 文件名模板</span>
+                <input id="multi-file-pattern" class="input" placeholder="默认 &lt;videoTitle&gt;/[P&lt;pageNumberWithZero&gt;]&lt;pageTitle&gt;">
+              </label>
+            </div>
+            <div class="checks mt">
+              <label class="check"><input type="checkbox" id="video-ascending"><span>视频升序（体积优先）</span></label>
+              <label class="check"><input type="checkbox" id="audio-ascending"><span>音频升序（体积优先）</span></label>
+              <label class="check"><input type="checkbox" id="download-danmaku"><span>下载弹幕</span></label>
+              <label class="check"><input type="checkbox" id="skip-mux"><span>跳过混流</span></label>
+              <label class="check"><input type="checkbox" id="skip-subtitle"><span>跳过字幕</span></label>
+              <label class="check"><input type="checkbox" id="skip-cover"><span>跳过封面</span></label>
+              <label class="check"><input type="checkbox" id="skip-ai"><span>跳过 AI 字幕</span></label>
+            </div>
+          </div>
+
+          <div class="card" id="settings-network">
+            <h2>接口与网络</h2>
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="use-tv-api"><span>使用 TV 端接口</span></label>
+              <label class="check"><input type="checkbox" id="use-app-api"><span>使用 APP 端接口</span></label>
+              <label class="check"><input type="checkbox" id="use-intl-api"><span>使用国际版接口</span></label>
+            </div>
+            <div class="grid two mt">
+              <label class="field"><span>BiliPlus Host</span><input id="host" class="input" placeholder="可选"></label>
+              <label class="field"><span>BiliPlus EP Host</span><input id="ep-host" class="input" placeholder="可选"></label>
+              <label class="field"><span>Area（hk / tw / th）</span><input id="area" class="input" placeholder="可选"></label>
+              <label class="field"><span>混流音轨语言</span><input id="language" class="input" placeholder="如 chi / jpn"></label>
+              <label class="field"><span>User-Agent</span><input id="user-agent" class="input" placeholder="默认随机"></label>
+              <label class="field"><span>UPOS Host</span><input id="upos-host" class="input" placeholder="可选"></label>
+            </div>
+          </div>
+
+          <div class="card" id="settings-credentials">
+            <h2>凭证</h2>
+            <label class="field wide">
+              <span>Cookie（可选，优先级低于扫码登录）</span>
+              <textarea id="cookie" class="input" rows="2" placeholder="SESSDATA=…; bili_jct=…" spellcheck="false"></textarea>
+            </label>
+            <label class="field wide">
+              <span>Access Token（TV / APP 接口用）</span>
+              <input id="access-token" class="input" placeholder="可选" spellcheck="false">
+            </label>
+          </div>
+
+          <div class="card" id="settings-developer">
+            <h2>开发者</h2>
+            <p class="card-note">调试窗口会实时显示 BBDown 的全部输出，并可发送参数直接运行 BBDown。调试模式仅在本次运行中启用，不写入配置。仅调用 BBDown.exe，不经过 shell。</p>
+            <button class="btn mt" id="open-debug">打开开发者调试窗口</button>
+          </div>
+
+          <div class="card" id="settings-log">
+            <h2>日志</h2>
+            <div class="grid two">
+              <label class="field">
+                <span>登录检测日志</span>
+                <select id="log-level" class="input">
+                  <option value="simple">简洁（仅显示检测到的清晰度）</option>
+                  <option value="detail">详细（显示完整 BBDown 输出）</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="card" id="settings-appearance">
+            <h2>外观</h2>
+            <div class="grid two">
+              <label class="field">
+                <span>主题色</span>
+                <select id="theme-color" class="input">
+                  <option value="blue">蓝色</option>
+                  <option value="purple">紫色</option>
+                  <option value="green">绿色</option>
+                  <option value="orange">橙色</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>界面窗口</span>
+                <select id="window-mode" class="input">
+                  <option value="edge">内置窗口（WebView）</option>
+                  <option value="browser">默认浏览器</option>
+                </select>
+              </label>
+            </div>
+            <p class="card-note mt">界面窗口模式将在下次启动时生效；内置窗口需要 Microsoft Edge / WebView2，缺失时会提示下载或改用浏览器。</p>
+          </div>
+
+          <div class="settings-bar">
+            <span class="dirty" id="settings-dirty" hidden>有未保存的修改</span>
+            <button class="btn ghost" id="reset-settings">恢复默认</button>
+            <button class="btn primary" id="save-settings">保存设置</button>
+          </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 关于 -->
+        <section class="page" id="page-about">
+          <div class="card about-head">
+            <div class="about-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="30" height="30"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+            </div>
+            <div>
+              <h2>BiliDownloader <span class="badge" id="about-version">v2.0</span></h2>
+              <p class="card-note">基于 BBDown 的 B 站视频下载器，本地 Web UI，无广告、无账号上传。</p>
+            </div>
+          </div>
+          <div class="card">
+            <h2>链接</h2>
+            <div class="row wrap">
+              <button class="btn" id="open-license">开放源代码许可</button>
+              <button class="btn" data-url="https://github.com/AnMo2077/bbdown_gui">本项目仓库</button>
+              <button class="btn" id="check-update">检查更新</button>
+            </div>
+            <p class="card-note mt" id="about-update-hint"></p>
+          </div>
+          <div class="card">
+            <h2>运行</h2>
+            <ul class="tips">
+              <li>界面只监听 <code>127.0.0.1</code>，随机端口，不对外网开放。</li>
+              <li>下载内核为 <code>BBDown.exe</code>，混流依赖 ffmpeg。</li>
+              <li>关闭窗口即退出服务；也可点击下方按钮结束进程。</li>
+            </ul>
+            <button class="btn danger" id="quit-button">退出程序</button>
+          </div>
+        </section>
+      </div>
+
+      <footer class="statusbar">
+        <span id="status-page">首页</span>
+        <span id="status-version">v2.0</span>
+      </footer>
+    </div>
+  </div>
+
+  <div class="qr-zoom" id="qr-zoom" hidden>
+    <img id="qr-zoom-img" alt="登录二维码（放大）">
+  </div>
+
+  <div class="toast-root" id="toast-root" aria-live="polite"></div>
+
+  <div class="modal" id="update-modal" hidden>
+    <div class="modal-card update-dialog" role="dialog" aria-modal="true" aria-labelledby="update-title">
+      <h3 id="update-title">需要更新</h3>
+      <p class="update-versions">当前版本 <b id="modal-current">v2.0</b> <span class="arrow">→</span> 最新版本 <b id="modal-latest">v2.1</b></p>
+      <p class="danger-text">此版本必须更新后才能继续使用。点击“更新”前往下载，安装完成后重新启动程序。</p>
+      <pre class="log-box modal-log" id="modal-log"></pre>
+      <div class="modal-actions">
+        <button class="btn" id="modal-quit">退出</button>
+        <button class="btn primary" id="modal-update">更新</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="optional-update-modal" hidden>
+    <div class="modal-card update-dialog" role="dialog" aria-modal="true" aria-labelledby="optional-update-title">
+      <button class="modal-close" id="optional-update-close" aria-label="关闭">×</button>
+      <h3 id="optional-update-title">发现新版本</h3>
+      <p class="update-versions">当前版本 <b id="optional-current">v2.0</b> <span class="arrow">→</span> 最新版本 <b id="optional-latest">v2.1</b></p>
+      <p class="card-note">本次不是强制更新，你可以稍后再更新。</p>
+      <pre class="log-box modal-log" id="optional-log" hidden></pre>
+      <div class="modal-actions">
+        <button class="btn ghost" id="optional-later">稍后</button>
+        <button class="btn primary" id="optional-download">前往下载</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="license-modal" hidden>
+    <div class="modal-card license-card" role="dialog" aria-modal="true" aria-labelledby="license-title">
+      <h3 id="license-title">开放源代码许可</h3>
+      <pre class="license-text" id="license-text">正在获取许可文本…</pre>
+      <div class="modal-actions">
+        <button class="btn primary" id="license-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="leave-modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+      <h3 id="leave-title">有未保存的修改</h3>
+      <p class="card-note">离开设置页前，要保存这些修改吗？</p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="leave-cancel">取消</button>
+        <button class="btn" id="leave-discard">放弃修改</button>
+        <button class="btn primary" id="leave-save">保存并离开</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="confirm-modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h3 id="confirm-title">确认操作</h3>
+      <p class="card-note" id="confirm-text"></p>
+      <div class="modal-actions">
+        <button class="btn" id="confirm-cancel">取消</button>
+        <button class="btn primary" id="confirm-ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
