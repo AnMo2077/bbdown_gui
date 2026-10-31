@@ -81,7 +81,18 @@ Get-ChildItem $FfmpegDir -File -Filter "*.dll" | ForEach-Object {
 
 $CurlDir = Copy-FirstMatch -Base (Join-Path $Extract "curl") -Filter "curl.exe" -Destination "curl.exe"
 Copy-FirstMatch -Base (Join-Path $Extract "curl") -Filter "libcurl-x64.dll" -Destination "libcurl-x64.dll" | Out-Null
-Copy-FirstMatch -Base (Join-Path $Extract "curl") -Filter "curl-ca-bundle.crt" -Destination "curl-ca-bundle.crt" | Out-Null
+
+$CaFile = Get-ChildItem (Join-Path $Extract "curl") -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in @("curl-ca-bundle.crt", "cacert.pem") } |
+    Select-Object -First 1
+if ($CaFile) {
+    Copy-Item $CaFile.FullName (Join-Path $Root "curl-ca-bundle.crt") -Force
+    Write-Host "  + curl-ca-bundle.crt"
+} else {
+    Write-Host "未在 curl 包中找到 CA 证书，改为下载 cacert.pem"
+    Invoke-WebRequest -Uri "https://curl.se/ca/cacert.pem" -OutFile (Join-Path $Root "curl-ca-bundle.crt") -UseBasicParsing -TimeoutSec 120
+    Write-Host "  + curl-ca-bundle.crt (cacert.pem)"
+}
 
 $Required = @("BBDown.exe", "ffmpeg.exe", "aria2c.exe", "curl.exe", "libcurl-x64.dll", "curl-ca-bundle.crt")
 $Missing = $Required | Where-Object { -not (Test-Path (Join-Path $Root $_)) }
@@ -94,5 +105,6 @@ Write-Host "第三方二进制就绪："
 Get-ChildItem $Root -File | Where-Object {
     $_.Name -in $Required -or $_.Extension -eq ".dll"
 } | Select-Object Name, Length | Format-Table -AutoSize
+
 
 
