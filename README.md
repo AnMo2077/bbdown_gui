@@ -115,7 +115,7 @@ py build_installer.py
 工作流：`.github/workflows/build.yml`
 
 - **push / pull_request**：编译检查 + 单元测试
-- **workflow_dispatch**：构建安装包并上传 Artifact
+- **workflow_dispatch**：构建安装包并上传 Artifact；`release_tag` 默认 `v2.0`，填写后会创建/更新对应 Release
 - **推送 `v*` 标签**：构建安装包、上传 Artifact，并自动创建 GitHub Release
 
 第三方二进制会缓存到 `vendor/`，缓存键包含脚本哈希。构建前会校验版本与发布者，安装包生成后输出 SHA256。

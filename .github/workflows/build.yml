@@ -7,6 +7,11 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "发布标签；留空则只上传 Artifact，不创建 Release"
+        required: false
+        default: "v2.0"
 
 permissions:
   contents: write
@@ -86,8 +91,12 @@ jobs:
           retention-days: 14
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           files: dist/BiliDownloader-Setup-*.exe
           generate_release_notes: true
+          draft: false
+          prerelease: false
