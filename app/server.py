@@ -3,9 +3,11 @@
 只监听 127.0.0.1，随机端口；所有写操作都经过动作白名单。
 """
 import ctypes
+import html
 import json
 import mimetypes
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -145,6 +147,53 @@ def _split_windows_args(command):
         return shlex.split(command, posix=False)
 
 
+def _nickname_from_space_title(title):
+    title = html.unescape(re.sub(r"<[^>]+>", "", str(title or ""))).strip()
+    for marker in ("的个人空间", "的个人主页"):
+        if marker in title:
+            name = re.sub(r"\s+", " ", title.split(marker, 1)[0]).strip()
+            if name and "哔哩哔哩" not in name and len(name) <= 60:
+                return name
+    return ""
+
+
+def _fetch_bili_nickname(uid):
+    """从空间页标题提取昵称；空间页不可用时回退到名片接口。"""
+    uid = str(uid or "").strip()
+    if not uid.isdigit():
+        return ""
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "zh-CN,zh;q=0.9",
+    }
+    try:
+        request = urllib.request.Request(f"https://space.bilibili.com/{uid}", headers=headers)
+        with urllib.request.urlopen(request, timeout=10) as response:
+            text = RemoteAPI._decode(response.read(300_000))
+        match = re.search(r"<title[^>]*>(.*?)</title>", text, re.S | re.I)
+        if match:
+            name = _nickname_from_space_title(match.group(1))
+            if name:
+                return name
+    except Exception:  # noqa: BLE001 - 昵称失败不应影响登录状态
+        pass
+    try:
+        request = urllib.request.Request(
+            f"https://api.bilibili.com/x/web-interface/card?mid={uid}", headers=headers
+        )
+        with urllib.request.urlopen(request, timeout=8) as response:
+            data = json.loads(RemoteAPI._decode(response.read(200_000)))
+        name = str((data.get("data") or {}).get("card", {}).get("name") or "").strip()
+        if name:
+            return name[:60]
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def _parse_update_links(payload):
     """兼容多种 update json 结构，返回有序的 [{name,url}]。"""
     links = []
@@ -221,6 +270,8 @@ class AppServer:
         self._login = {"status": "idle", "qr": "", "message": ""}
         self._probe = {"status": "idle"}
         self._probe_refresh_pending = False
+        self._nickname = ""
+        self._nickname_uid = ""
         self._update_links_cache = {}
         self._debug_log = []
         self._debug_seq = 0
@@ -281,6 +332,9 @@ class AppServer:
         if os.path.isfile(self.runner.data_path):
             self._probe = {"status": "checking"}
             threading.Thread(
+                target=self._refresh_nickname, args=(True,), daemon=True, name="nickname"
+            ).start()
+            threading.Thread(
                 target=self._auto_probe, daemon=True, name="auto-login-probe"
             ).start()
 
@@ -294,6 +348,40 @@ class AppServer:
             self._append_debug(line, "probe")
         with self._lock:
             self._probe = result
+        if result.get("logged_in"):
+            self._refresh_nickname(force=True)
+
+    def _account_with_nickname(self):
+        account = self.runner.account_state()
+        mid = str(account.get("mid") or "")
+        with self._lock:
+            nickname = self._nickname if (mid and self._nickname_uid == mid) else ""
+        account["nickname"] = nickname
+        return account
+
+    def _refresh_nickname(self, force=False):
+        account = self.runner.account_state()
+        mid = str(account.get("mid") or "")
+        if not account.get("logged_in") or not mid:
+            with self._lock:
+                self._nickname = ""
+                self._nickname_uid = ""
+            return ""
+        if not force:
+            with self._lock:
+                if self._nickname_uid == mid and self._nickname:
+                    return self._nickname
+        name = _fetch_bili_nickname(mid)
+        with self._lock:
+            current_mid = str(self.runner.account_state().get("mid") or "")
+            if current_mid == mid:
+                if name:
+                    self._nickname = name
+                    self._nickname_uid = mid
+                elif self._nickname_uid != mid:
+                    self._nickname = ""
+                    self._nickname_uid = mid
+        return name
 
     def stop(self):
         try:
@@ -403,7 +491,7 @@ class AppServer:
             "default_dir": self._default_work_dir(),
             "config": dict(self.config.config),
             "appearance": self._appearance(),
-            "account": self.runner.account_state(),
+            "account": self._account_with_nickname(),
             "probe": dict(self._probe),
             "running": self._running,
             "progress": self._progress,
@@ -804,6 +892,9 @@ class AppServer:
             self._login["message"] = (
                 "登录状态正常" if result["logged_in"] else "未登录或凭证已失效"
             )
+        if result["logged_in"]:
+            self._refresh_nickname(force=True)
+        result["account_state"] = self._account_with_nickname()
         return result
 
     def _action_login_status(self, payload):
@@ -813,12 +904,15 @@ class AppServer:
                 self._login = dict(snapshot)
             data = dict(self._login)
             data["probe"] = dict(self._probe)
-        data["account"] = self.runner.account_state()
+        data["account"] = self._account_with_nickname()
 
         # 扫码成功且这次登录还没检测过时，自动补一次会员等级检测
         if data.get("status") == "success" and self._probe_refresh_pending:
             self._probe_refresh_pending = False
             self._probe = {"status": "checking"}
+            threading.Thread(
+                target=self._refresh_nickname, args=(True,), daemon=True, name="nickname"
+            ).start()
             threading.Thread(target=self._auto_probe, daemon=True).start()
         return data
 
@@ -831,7 +925,9 @@ class AppServer:
         with self._lock:
             self._login = {"status": "idle", "qr": "", "message": ""}
             self._probe = {"status": "idle"}
-        return {"account": self.runner.account_state()}
+            self._nickname = ""
+            self._nickname_uid = ""
+        return {"account": self._account_with_nickname()}
 
     def _action_check_update(self, payload):
         with self._lock:

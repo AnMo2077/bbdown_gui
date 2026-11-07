@@ -78,9 +78,18 @@ jobs:
           $setup = "dist/BiliDownloader-Setup-2.1.exe"
           if (-not (Test-Path $setup)) { throw "安装包未生成: $setup" }
           $info = (Get-Item $setup).VersionInfo
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash
           "Version: $($info.FileVersion) / $($info.ProductVersion)"
           "Publisher: $($info.CompanyName)"
-          "SHA256: $((Get-FileHash $setup -Algorithm SHA256).Hash)"
+          "SHA256: $hash"
+          Set-Content -Path dist/release-body.md -Encoding utf8 -Value @(
+            "BiliDownloader 2.1 自动构建",
+            "",
+            "- 安装包：BiliDownloader-Setup-2.1.exe",
+            "- SHA256：$hash",
+            "",
+            "本次构建由 GitHub Actions 自动生成并上传。"
+          )
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -96,8 +105,8 @@ jobs:
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          body_path: dist/release-body.md
           files: dist/BiliDownloader-Setup-*.exe
-          generate_release_notes: true
           overwrite_files: true
           draft: false
           prerelease: false

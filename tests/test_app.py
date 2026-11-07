@@ -31,7 +31,13 @@ def _remove(path):
 from app.api import RemoteAPI  # noqa: E402
 from app.bbdown import BBDownRunner, decode_line, mask_secrets  # noqa: E402
 from app.config import DEFAULT_CONFIG, ConfigManager  # noqa: E402
-from app.server import APP_VERSION, AppServer, _parse_update_links, _version_tuple  # noqa: E402
+from app.server import (  # noqa: E402
+    APP_VERSION,
+    AppServer,
+    _nickname_from_space_title,
+    _parse_update_links,
+    _version_tuple,
+)
 
 
 def _post(server, payload, headers=None):
@@ -306,6 +312,16 @@ class UpdateLinksTests(unittest.TestCase):
             RemoteAPI._parse(text, "updatejsonurl="),
             "https://example.com/update.json",
         )
+
+
+class NicknameTests(unittest.TestCase):
+    def test_space_title(self):
+        title = "Perfect_AnMo的个人空间-Perfect_AnMo个人主页-哔哩哔哩视频"
+        self.assertEqual(_nickname_from_space_title(title), "Perfect_AnMo")
+
+    def test_space_title_entities_and_generic(self):
+        self.assertEqual(_nickname_from_space_title("A &amp; B的个人空间"), "A & B")
+        self.assertEqual(_nickname_from_space_title("哔哩哔哩 (゜-゜)つロ 干杯~"), "")
 
 
 class VersionTests(unittest.TestCase):

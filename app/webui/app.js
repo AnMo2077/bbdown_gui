@@ -497,6 +497,10 @@
         $('qr-status-sub').textContent = probe.status === 'checking'
           ? '正在检测会员等级…'
           : (probe.max_label ? `最高画质 ${probe.max_label}` : '');
+        const nickname = String(account.nickname || '').trim();
+        const nameNode = $('qr-status-name');
+        nameNode.textContent = nickname;
+        nameNode.hidden = !nickname;
         $('qr-status-uid').textContent = account.mid ? `UID ${account.mid}` : '';
       } else {
         panel.hidden = true;
@@ -1435,6 +1439,10 @@
         const data = await action('login_check');
         const ok = !!data.logged_in;
         state.probe = data;
+        if (data.account_state) {
+          state.account = data.account_state;
+          renderQrArea();
+        }
         if (ok) {
           const bits = [`登录状态正常${data.account ? '：' + data.account : ''}`];
           if (data.membership) bits.push(data.membership);
