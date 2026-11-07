@@ -208,7 +208,7 @@ body.sidebar-collapsed .nav-item { justify-content: center; padding: 0; }
 @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 
 /* 设置页子导航 */
-#page-settings { max-width: 1040px; }
+#page-settings, #page-download { max-width: 1040px; }
 .settings-layout { display: flex; align-items: flex-start; gap: 24px; }
 .settings-nav {
   position: sticky;
@@ -621,6 +621,8 @@ html[data-theme="light"] .dirty { color: #b8860b; }
 }
 .modal-card h3 { margin: 0 0 14px; font-size: 20px; font-weight: 600; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.update-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.update-links:empty { display: none; }
 .modal-close {
   position: absolute;
   top: 12px;

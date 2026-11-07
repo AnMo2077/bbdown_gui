@@ -23,6 +23,7 @@
     queue: [],
     queueRunning: false,
     queueIndex: -1,
+    downloadTab: 'single',
     forcedShown: false,
     optionalShown: false,
     loginQr: '',
@@ -174,7 +175,10 @@
     if ((state.appearance.mode || 'System') === 'System') applyAppearance();
   });
 
-  window.addEventListener('resize', () => moveNavIndicator(false));
+  window.addEventListener('resize', () => {
+    moveNavIndicator(false);
+    moveDownloadIndicator(false);
+  });
 
   let pendingLeavePage = null;
 
@@ -228,6 +232,9 @@
     if (location.hash !== `#${name}`) history.replaceState(null, '', `#${name}`);
 
     if (name === 'login') refreshLogin(true);
+    if (name === 'download') {
+      requestAnimationFrame(() => showDownloadTab(state.downloadTab, false));
+    }
     if (name === 'settings') requestAnimationFrame(() => {
       moveSettingsIndicator(false);
       updateSettingsNav();
@@ -258,7 +265,7 @@
   }
 
   function setSettingsNavActive(id, animate = true) {
-    document.querySelectorAll('.settings-nav-item').forEach((item) => {
+    document.querySelectorAll('#settings-nav .settings-nav-item').forEach((item) => {
       item.classList.toggle('active', item.dataset.target === id);
     });
     moveSettingsIndicator(animate);
@@ -376,6 +383,37 @@
     }
   }
 
+  async function loadUpdateLinks(containerId, fallbackId) {
+    const container = $(containerId);
+    const fallback = $(fallbackId);
+    if (!container || !fallback) return;
+    container.innerHTML = '';
+    fallback.hidden = false;
+    try {
+      const data = await action('update_links');
+      const links = Array.isArray(data.links) ? data.links : [];
+      if (!links.length) return;
+      fallback.hidden = true;
+      links.forEach((link) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn primary';
+        button.textContent = link.name;
+        button.title = link.url;
+        button.addEventListener('click', async () => {
+          try {
+            await openUrl(link.url);
+          } catch (error) {
+            toast(error.message, 'error');
+          }
+        });
+        container.appendChild(button);
+      });
+    } catch (error) {
+      // JSON 缺失或网络失败时保留原有“更新/前往下载”按钮
+    }
+  }
+
   function showOptionalUpdate() {
     const info = state.announce || {};
     state.optionalShown = true;
@@ -392,6 +430,7 @@
         toast('更新地址缺失，请联系作者', 'error');
       }
     };
+    loadUpdateLinks('optional-links', 'optional-download');
   }
 
   function hideOptionalUpdate() {
@@ -421,6 +460,7 @@
       }
       document.body.innerHTML = '<div style="display:grid;place-items:center;height:100vh;font-family:Segoe UI,sans-serif;opacity:.7">程序已退出，可关闭此窗口。</div>';
     };
+    loadUpdateLinks('modal-links', 'modal-update');
   }
 
   function renderQrArea() {
@@ -535,8 +575,11 @@
 
   function renderDownloadState() {
     const busy = state.running || state.queueRunning;
+    const singleTab = $('download-pane-single') && !$('download-pane-single').hidden;
     $('start-button').disabled = busy;
     $('stop-button').disabled = !state.running;
+    $('start-button').hidden = !singleTab || state.queueRunning;
+    $('stop-button').hidden = !singleTab || state.queueRunning;
     $('open-output').hidden = state.running || !(state.lastOutput || state.lastOutputDir);
     if ($('queue-start')) {
       $('queue-start').disabled = busy || !state.queue.length;
@@ -666,6 +709,47 @@
   // ---------------------------------------------------------------- //
   //  下载
   // ---------------------------------------------------------------- //
+  let downloadNavReady = false;
+
+  function moveDownloadIndicator(animate = true) {
+    const nav = $('download-nav');
+    const indicator = $('download-nav-indicator');
+    if (!nav || !indicator) return;
+    const active = nav.querySelector('.settings-nav-item.active');
+    if (!active) return;
+    const y = active.offsetTop + (active.offsetHeight - 18) / 2;
+    const useAnimation = animate && downloadNavReady;
+    if (!useAnimation) indicator.style.transition = 'none';
+    indicator.style.transform = `translateY(${y}px)`;
+    indicator.hidden = false;
+    if (!useAnimation) {
+      void indicator.offsetWidth;
+      indicator.style.transition = '';
+    }
+    downloadNavReady = true;
+  }
+
+  function setDownloadTabActive(name, animate = true) {
+    document.querySelectorAll('#download-nav .settings-nav-item').forEach((item) => {
+      item.classList.toggle('active', item.dataset.downloadTab === name);
+    });
+    moveDownloadIndicator(animate);
+  }
+
+  function showDownloadTab(name, animate = false) {
+    // 下载进行中时锁定当前页签，避免把“停止”按钮藏起来
+    if (state.queueRunning) name = 'queue';
+    else if (state.running) name = 'single';
+    const single = name !== 'queue';
+    state.downloadTab = single ? 'single' : 'queue';
+    const singlePane = $('download-pane-single');
+    const queuePane = $('download-pane-queue');
+    if (singlePane) singlePane.hidden = !single;
+    if (queuePane) queuePane.hidden = single;
+    setDownloadTabActive(state.downloadTab, animate);
+    renderDownloadState();
+  }
+
   function currentUrl() {
     return ($('url-input').value || '').trim();
   }
@@ -1288,6 +1372,10 @@
     });
     $('queue-start').addEventListener('click', startQueue);
     $('queue-stop').addEventListener('click', stopQueue);
+    $('download-nav').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-download-tab]');
+      if (button) showDownloadTab(button.dataset.downloadTab, true);
+    });
     $('part-mode').addEventListener('change', (event) => {
       $('page-range-field').hidden = event.target.value !== 'specific';
     });
@@ -1305,6 +1393,7 @@
     $('video-only-switch').addEventListener('change', () => syncModes('video'));
     $('audio-only-switch').addEventListener('change', () => syncModes('audio'));
     renderQueue();
+    showDownloadTab('single', false);
 
     // 登录
     $('login-refresh').addEventListener('click', async () => {

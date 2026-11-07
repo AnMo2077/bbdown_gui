@@ -313,6 +313,8 @@ def build_installer(icon, version_file):
         "tkinter.messagebox",
         "--hidden-import",
         "winreg",
+        "--collect-all",
+        "customtkinter",
     ]
     if icon:
         cmd += ["--add-data", f"{icon};.", "--icon", str(icon)]

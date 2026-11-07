@@ -16,6 +16,7 @@ class RemoteAPI:
         log=更新日志
         update=y
         url=https://example.com/
+        updatejsonurl=https://example.com/update.json
     """
 
     DATA_URL = "https://api2.nzs233.xyz/bilidown.txt"
@@ -32,6 +33,7 @@ class RemoteAPI:
         self.prog_ver = ""
         self.update = ""
         self.url = ""
+        self.update_json_url = ""
         self.fetched = False
         self.error = None
 
@@ -53,6 +55,10 @@ class RemoteAPI:
                 self.prog_ver = self._parse(data, "prog_ver=")
                 self.update = self._parse(data, "update=").strip().lower()
                 self.url = self._parse(data, "url=")
+                self.update_json_url = (
+                    self._parse(data, "updatejsonurl=")
+                    or self._parse(data, "update_json_url=")
+                )
                 self.fetched = True
                 self.error = None
                 if on_done:

@@ -31,7 +31,7 @@ def _remove(path):
 from app.api import RemoteAPI  # noqa: E402
 from app.bbdown import BBDownRunner, decode_line, mask_secrets  # noqa: E402
 from app.config import DEFAULT_CONFIG, ConfigManager  # noqa: E402
-from app.server import APP_VERSION, AppServer, _version_tuple  # noqa: E402
+from app.server import APP_VERSION, AppServer, _parse_update_links, _version_tuple  # noqa: E402
 
 
 def _post(server, payload, headers=None):
@@ -179,6 +179,24 @@ class ServerTests(unittest.TestCase):
         names = {item["name"] for item in data["core_files"]}
         self.assertEqual(names, {"BBDown.exe", "curl.exe", "aria2c.exe", "ffmpeg.exe"})
 
+    def test_update_links_action(self):
+        self.server.api.update_json_url = "https://example.com/update.json"
+        payload = json.dumps({
+            "url1": "https://example.com/a",
+            "url1name": "GitHub",
+            "url2": "https://example.com/b",
+            "url2name": "备用下载",
+        }).encode("utf-8")
+        response = mock.MagicMock()
+        response.read.return_value = payload
+        response.__enter__.return_value = response
+        with mock.patch("app.server.urllib.request.urlopen", return_value=response):
+            data = self.server._action_update_links({})
+        self.assertEqual(
+            [item["name"] for item in data["links"]],
+            ["GitHub", "备用下载"],
+        )
+
     def test_announce_update_flags(self):
         api = self.server.api
         api.fetched = True
@@ -199,7 +217,7 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(announce["update"])
         self.assertFalse(announce["must_update"])
 
-        api.prog_ver = "2.1"
+        api.prog_ver = APP_VERSION
         api.update = "y"
         announce = self.server._announce()
         self.assertFalse(announce["update"])
@@ -259,6 +277,35 @@ class ServerTests(unittest.TestCase):
     def test_open_url_scheme(self):
         status, data = _post(self.server, {"action": "open_url", "url": "file:///C:/Windows"})
         self.assertFalse(data["ok"])
+
+
+class UpdateLinksTests(unittest.TestCase):
+    def test_flat_update_json_keeps_order_and_names(self):
+        links = _parse_update_links({
+            "url1": "https://example.com/a",
+            "url1name": "GitHub",
+            "url2": "https://example.com/b",
+            "url2name": "备用下载",
+        })
+        self.assertEqual([item["name"] for item in links], ["GitHub", "备用下载"])
+        self.assertEqual(links[0]["url"], "https://example.com/a")
+
+    def test_array_update_json_and_invalid_scheme(self):
+        links = _parse_update_links({
+            "urls": [
+                {"name": "官网", "url": "https://example.com/"},
+                {"name": "无效", "url": "javascript:alert(1)"},
+                {"name": "重复", "url": "https://example.com/"},
+            ]
+        })
+        self.assertEqual(links, [{"name": "官网", "url": "https://example.com/"}])
+
+    def test_remote_config_reads_update_json_url(self):
+        text = "prog_ver=2.1\nupdate=y\nurl=https://example.com/\nupdatejsonurl=https://example.com/update.json"
+        self.assertEqual(
+            RemoteAPI._parse(text, "updatejsonurl="),
+            "https://example.com/update.json",
+        )
 
 
 class VersionTests(unittest.TestCase):

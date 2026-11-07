@@ -119,6 +119,15 @@
 
         <!-- 下载 -->
         <section class="page" id="page-download">
+          <div class="settings-layout">
+            <aside class="settings-nav" id="download-nav" aria-label="下载方式">
+              <span class="settings-nav-indicator" id="download-nav-indicator" hidden></span>
+              <button class="settings-nav-item active" data-download-tab="single">单个下载</button>
+              <button class="settings-nav-item" data-download-tab="queue">下载队列</button>
+            </aside>
+            <div class="settings-content">
+
+          <div id="download-pane-single">
           <div class="card">
             <h2>视频地址</h2>
             <div class="row">
@@ -127,7 +136,9 @@
               <button class="btn ghost" id="clear-url">清空</button>
             </div>
           </div>
+          </div>
 
+          <div id="download-pane-queue" hidden>
           <div class="card">
             <h2>下载队列</h2>
             <div class="row tight">
@@ -140,9 +151,10 @@
             </div>
             <ul class="queue-list" id="queue-list"></ul>
             <div class="row mt">
-              <button class="btn primary" id="queue-start">开始队列</button>
+              <button class="btn primary" id="queue-start">开始下载</button>
               <button class="btn danger" id="queue-stop" hidden>停止队列</button>
             </div>
+          </div>
           </div>
 
           <div class="card">
@@ -206,6 +218,8 @@
               <button class="link" id="clear-log">清空</button>
             </div>
             <pre class="log" id="log-output"></pre>
+          </div>
+            </div>
           </div>
         </section>
 
@@ -475,10 +489,11 @@
     <div class="modal-card update-dialog" role="dialog" aria-modal="true" aria-labelledby="update-title">
       <h3 id="update-title">需要更新</h3>
       <p class="update-versions">当前版本 <b id="modal-current">v2.1</b> <span class="arrow">→</span> 最新版本 <b id="modal-latest">v2.1</b></p>
-      <p class="danger-text">此版本必须更新后才能继续使用。点击“更新”前往下载，安装完成后重新启动程序。</p>
+      <p class="danger-text">此版本必须更新后才能继续使用。请选择下方下载方式，安装完成后重新启动程序。</p>
       <pre class="log-box modal-log" id="modal-log"></pre>
       <div class="modal-actions">
         <button class="btn" id="modal-quit">退出</button>
+        <div class="update-links" id="modal-links"></div>
         <button class="btn primary" id="modal-update">更新</button>
       </div>
     </div>
@@ -493,6 +508,7 @@
       <pre class="log-box modal-log" id="optional-log" hidden></pre>
       <div class="modal-actions">
         <button class="btn ghost" id="optional-later">稍后</button>
+        <div class="update-links" id="optional-links"></div>
         <button class="btn primary" id="optional-download">前往下载</button>
       </div>
     </div>

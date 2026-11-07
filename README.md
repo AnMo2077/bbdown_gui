@@ -103,7 +103,7 @@ pwsh -File scripts/fetch-binaries.ps1
 pwsh -File scripts/fetch-binaries.ps1
 
 # 2. 安装构建依赖
-py -m pip install -r requirements.txt pyinstaller pillow
+py -m pip install -r requirements.txt pyinstaller pillow customtkinter
 
 # 3. 构建
 py build_installer.py

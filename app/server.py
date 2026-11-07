@@ -145,6 +145,55 @@ def _split_windows_args(command):
         return shlex.split(command, posix=False)
 
 
+def _parse_update_links(payload):
+    """兼容多种 update json 结构，返回有序的 [{name,url}]。"""
+    links = []
+
+    def add(name, url):
+        url = str(url or "").strip()
+        if not url.lower().startswith(("http://", "https://")):
+            return
+        if any(item["url"] == url for item in links):
+            return
+        name = str(name or "").strip() or f"下载 {len(links) + 1}"
+        links.append({"name": name[:60], "url": url})
+
+    if isinstance(payload, list):
+        for index, item in enumerate(payload):
+            if isinstance(item, dict):
+                add(item.get("name") or item.get("title"), item.get("url") or item.get("link"))
+            elif isinstance(item, str):
+                add(f"下载 {index + 1}", item)
+    elif isinstance(payload, dict):
+        for key in ("urls", "links", "downloads", "items"):
+            values = payload.get(key)
+            if isinstance(values, list):
+                for index, item in enumerate(values):
+                    if isinstance(item, dict):
+                        add(
+                            item.get("name") or item.get("title"),
+                            item.get("url") or item.get("link"),
+                        )
+                    elif isinstance(item, str):
+                        add(f"下载 {index + 1}", item)
+        if isinstance(payload.get("data"), (list, dict)):
+            for item in _parse_update_links(payload["data"]):
+                add(item["name"], item["url"])
+        for index in range(1, 21):
+            value = payload.get(f"url{index}") or payload.get(f"url_{index}")
+            if isinstance(value, dict):
+                add(value.get("name"), value.get("url"))
+            elif value:
+                name = (
+                    payload.get(f"url{index}name")
+                    or payload.get(f"url_{index}_name")
+                    or payload.get(f"url{index}_name")
+                    or payload.get(f"name{index}")
+                )
+                add(name, value)
+    return links[:12]
+
+
 class AppServer:
     """本地服务：持有配置、下载器、远程公告与日志状态。"""
 
@@ -172,6 +221,7 @@ class AppServer:
         self._login = {"status": "idle", "qr": "", "message": ""}
         self._probe = {"status": "idle"}
         self._probe_refresh_pending = False
+        self._update_links_cache = {}
         self._debug_log = []
         self._debug_seq = 0
         self._debug_running = False
@@ -198,6 +248,7 @@ class AppServer:
             "login_status": self._action_login_status,
             "logout": self._action_logout,
             "check_update": self._action_check_update,
+            "update_links": self._action_update_links,
             "license": self._action_license,
             "debug_state": self._action_debug_state,
             "debug_enable": self._action_debug_enable,
@@ -327,6 +378,7 @@ class AppServer:
             "must_update": update_available and forced_flag,
             "update_flag": flag,
             "url": api.url,
+            "update_json_url": api.update_json_url,
             "fetched": api.fetched,
             "error": api.error,
         }
@@ -782,8 +834,40 @@ class AppServer:
         return {"account": self.runner.account_state()}
 
     def _action_check_update(self, payload):
+        with self._lock:
+            self._update_links_cache.clear()
         self.api.fetch()
         return {"announce": self._announce()}
+
+    def _action_update_links(self, payload):
+        """拉取远端 update json，返回下载方式列表。"""
+        url = str(getattr(self.api, "update_json_url", "") or "").strip()
+        if not url:
+            return {"links": []}
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("updatejsonurl 只允许 http/https")
+        with self._lock:
+            cached = self._update_links_cache.get(url)
+        if cached is not None:
+            return {"links": list(cached)}
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": RemoteAPI.USER_AGENT, "Cache-Control": "no-cache"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                raw = response.read(512 * 1024)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"获取更新地址失败：{exc}") from exc
+        try:
+            data = json.loads(RemoteAPI._decode(raw))
+        except (ValueError, TypeError) as exc:
+            raise RuntimeError("更新地址 JSON 格式无效") from exc
+        links = _parse_update_links(data)
+        with self._lock:
+            self._update_links_cache[url] = links
+        return {"links": links}
 
     def _action_license(self, payload):
         """代理拉取远程许可文本，避免前端跨域。"""
