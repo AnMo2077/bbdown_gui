@@ -29,7 +29,13 @@ def _remove(path):
         pass
 
 from app.api import RemoteAPI  # noqa: E402
-from app.bbdown import BBDownRunner, decode_line, mask_secrets  # noqa: E402
+from app.bbdown import (  # noqa: E402
+    BBDownRunner,
+    _membership_from_vip,
+    _parse_vip_info,
+    decode_line,
+    mask_secrets,
+)
 from app.config import DEFAULT_CONFIG, ConfigManager  # noqa: E402
 from app.server import (  # noqa: E402
     APP_VERSION,
@@ -114,6 +120,20 @@ class BBDownTests(unittest.TestCase):
     def test_decode_line(self):
         self.assertEqual(decode_line("中文".encode("utf-8")), "中文")
         self.assertEqual(decode_line("中文".encode("gbk")), "中文")
+
+    def test_parse_vip_info(self):
+        active = _parse_vip_info({
+            "status": 1,
+            "type": 2,
+            "label": {"text": "年度大会员"},
+        })
+        self.assertTrue(active["is_vip"])
+        self.assertEqual(active["label"], "年度大会员")
+        self.assertFalse(_parse_vip_info({"status": 0, "type": 0})["is_vip"])
+        self.assertIsNone(_parse_vip_info(None))
+        self.assertEqual(_membership_from_vip(True, active), "大会员")
+        self.assertEqual(_membership_from_vip(True, None), "未知")
+        self.assertEqual(_membership_from_vip(False, None), "未登录")
 
     def test_build_args_basic(self):
         self.config.update(
@@ -206,7 +226,7 @@ class ServerTests(unittest.TestCase):
     def test_announce_update_flags(self):
         api = self.server.api
         api.fetched = True
-        api.prog_ver = "2.2"
+        api.prog_ver = "9.9"
         api.update = "y"
         api.url = "https://example.com/new"
         announce = self.server._announce()
@@ -307,7 +327,7 @@ class UpdateLinksTests(unittest.TestCase):
         self.assertEqual(links, [{"name": "官网", "url": "https://example.com/"}])
 
     def test_remote_config_reads_update_json_url(self):
-        text = "prog_ver=2.1\nupdate=y\nurl=https://example.com/\nupdatejsonurl=https://example.com/update.json"
+        text = "prog_ver=2.2\nupdate=y\nurl=https://example.com/\nupdatejsonurl=https://example.com/update.json"
         self.assertEqual(
             RemoteAPI._parse(text, "updatejsonurl="),
             "https://example.com/update.json",
@@ -326,7 +346,7 @@ class NicknameTests(unittest.TestCase):
 
 class VersionTests(unittest.TestCase):
     def test_version_tuple(self):
-        self.assertGreater(_version_tuple("2.1"), _version_tuple("2.0"))
+        self.assertGreater(_version_tuple("2.2"), _version_tuple("2.1"))
         self.assertEqual(_version_tuple("v2.0.0"), (2, 0, 0))
 
 

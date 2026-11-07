@@ -1,4 +1,4 @@
-/* BiliDownloader 2.1 — 依据实机截图还原的深色 Fluent 界面 */
+/* BiliDownloader 2.2 — 依据实机截图还原的深色 Fluent 界面 */
 :root {
   --sidebar-w: 240px;
   --radius: 8px;
@@ -546,6 +546,7 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; font-family:
   image-rendering: auto;
 }
 .login-info h2 { margin-bottom: 10px; }
+#login-message { white-space: pre-line; }
 .login-status { margin: 14px 0; font-size: 13px; color: var(--text-2); }
 .login-status.ok { color: var(--ok); }
 .check-result { margin-top: 12px; max-height: 260px; font-size: 12px; }

@@ -24,7 +24,7 @@ from .bbdown import BBDownRunner, decode_line, mask_secrets
 from .qrlogin import BiliQRLogin
 from .config import ConfigManager, DEFAULT_CONFIG
 
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 PUBLISHER = "AnMo_C"
 LOG_LIMIT = 800
 CORE_FILES = ("BBDown.exe", "curl.exe", "aria2c.exe", "ffmpeg.exe")
@@ -340,7 +340,7 @@ class AppServer:
 
     def _auto_probe(self):
         try:
-            result = self.runner.probe_login("ss1177")
+            result = self.runner.check_login_api()
             result["status"] = "done"
         except Exception as exc:  # noqa: BLE001
             result = {"status": "error", "error": str(exc)}
@@ -882,8 +882,8 @@ class AppServer:
         return data
 
     def _action_login_check(self, payload):
-        """用 ss1177 做一次仅解析，验证当前登录凭证是否可用。"""
-        result = self.runner.probe_login("ss1177")
+        """直接调用 B 站 nav 接口验证登录，不运行视频解析。"""
+        result = self.runner.check_login_api()
         result["status"] = "done"
         for line in str(result.get("detail") or "").splitlines():
             self._append_debug(line, "probe")
@@ -1132,7 +1132,7 @@ def _version_tuple(text):
 
 def _make_handler(app):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "BiliDownloader/2.1"
+        server_version = "BiliDownloader/2.2"
 
         def log_message(self, fmt, *args):  # noqa: A003 - 静默访问日志
             return

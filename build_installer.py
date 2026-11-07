@@ -29,7 +29,7 @@ PAYLOAD = BUILD / "payload.zip"
 ICON = BUILD / "app.ico"
 
 APP_NAME = "BiliDownloader"
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 PUBLISHER = "AnMo_C"
 
 BINARIES = [

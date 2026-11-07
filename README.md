@@ -37,7 +37,7 @@ Windows 下的 B 站视频下载器：本地 Web UI（WinUI 3 Fluent 风格）�
 
 ## 下载与安装
 
-从 [Releases](https://github.com/AnMo2077/bbdown_gui/releases) 下载 `BiliDownloader-Setup-2.1.exe`。
+从 [Releases](https://github.com/AnMo2077/bbdown_gui/releases) 下载 `BiliDownloader-Setup-2.2.exe`。
 
 - 默认安装到 `%LOCALAPPDATA%\Programs\BiliDownloader`（当前用户，无需管理员）
 - 安装时可自行修改安装路径
@@ -111,7 +111,7 @@ py -m pip install -r requirements.txt pyinstaller pillow customtkinter
 py build_installer.py
 ```
 
-产物：`dist\BiliDownloader-Setup-2.1.exe`
+产物：`dist\BiliDownloader-Setup-2.2.exe`
 
 构建流程：PyInstaller 打包应用（onedir）→ 复制 BBDown / ffmpeg / aria2c / curl 与 DLL → 打包卸载器 → 压缩 payload → 生成单文件安装程序。
 
@@ -122,7 +122,7 @@ py build_installer.py
 工作流：`.github/workflows/build.yml`
 
 - **push / pull_request**：编译检查 + 单元测试
-- **workflow_dispatch**：构建安装包并上传 Artifact；`release_tag` 默认 `v2.1`，填写后会创建/更新对应 Release
+- **workflow_dispatch**：构建安装包并上传 Artifact；`release_tag` 默认 `v2.2`，填写后会创建/更新对应 Release
 - **推送 `v*` 标签**：构建安装包、上传 Artifact，并自动创建 GitHub Release
 
 第三方二进制会缓存到 `vendor/`，缓存键包含脚本哈希。构建前会校验版本与发布者，安装包生成后输出 SHA256。

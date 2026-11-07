@@ -1,11 +1,11 @@
-/* BiliDownloader 2.1 — 前端逻辑（无框架、无外部依赖） */
+/* BiliDownloader 2.2 — 前端逻辑（无框架、无外部依赖） */
 (() => {
   'use strict';
 
   const $ = (id) => document.getElementById(id);
 
   const state = {
-    version: '2.1',
+    version: '2.2',
     publisher: 'AnMo_C',
     defaultDir: '',
     config: {},
@@ -487,16 +487,21 @@
         placeholder.hidden = true;
         box.classList.add('has-status');
         const membership = probe.status === 'done' ? (probe.membership || '') : '';
+        const membershipLabel = probe.status === 'done'
+          ? (probe.vip_label || probe.membership || '')
+          : '';
         const tone = membership === '大会员' ? 'vip'
           : membership === '未登录' ? 'none'
             : membership === '普通用户' ? 'normal' : '';
         const icon = $('qr-status-icon');
         icon.className = 'member-icon ' + tone;
         icon.innerHTML = MEMBER_ICONS[membership] || MEMBER_ICONS.default;
-        $('qr-status-badge').textContent = probe.status === 'checking' ? '已登录' : (membership || '已登录');
+        $('qr-status-badge').textContent = probe.status === 'checking'
+          ? '已登录'
+          : (membershipLabel || '已登录');
         $('qr-status-sub').textContent = probe.status === 'checking'
-          ? '正在检测会员等级…'
-          : (probe.max_label ? `最高画质 ${probe.max_label}` : '');
+          ? '正在检测会员状态…'
+          : '';
         const nickname = String(account.nickname || '').trim();
         const nameNode = $('qr-status-name');
         nameNode.textContent = nickname;
@@ -528,8 +533,7 @@
       if (probe.status === 'checking') {
         text += ' · 正在检测会员等级…';
       } else if (probe.status === 'done') {
-        text += ` · ${probe.membership || '未知'}`;
-        if (probe.max_label) text += `（最高 ${probe.max_label}）`;
+        text += ` · ${probe.vip_label || probe.membership || '未知'}`;
       }
     }
     const status = $('login-status');
@@ -1432,9 +1436,8 @@
       const box = $('login-check-result');
       button.disabled = true;
       box.hidden = true;
-      $('login-check-qualities').hidden = true;
       $('login-log-hint').hidden = true;
-      $('login-message').textContent = '正在用 ss1177 检测登录状态…';
+      $('login-message').textContent = '正在调用 B 站接口检测登录状态…';
       try {
         const data = await action('login_check');
         const ok = !!data.logged_in;
@@ -1444,26 +1447,28 @@
           renderQrArea();
         }
         if (ok) {
-          const bits = [`登录状态正常${data.account ? '：' + data.account : ''}`];
-          if (data.membership) bits.push(data.membership);
-          if (data.max_label) bits.push(`最高 ${data.max_label}`);
-          $('login-message').textContent = bits.join(' · ');
+          const api = data.api || {};
+          const apiBits = [];
+          if ('isLogin' in api) apiBits.push(`isLogin=${api.isLogin}`);
+          if (api.mid) apiBits.push(`mid=${api.mid}`);
+          if (api.vipStatus !== undefined && api.vipStatus !== null) apiBits.push(`vipStatus=${api.vipStatus}`);
+          if (api.vipType !== undefined && api.vipType !== null) apiBits.push(`vipType=${api.vipType}`);
+          if (api.vipLabel) apiBits.push(`vipLabel=${api.vipLabel}`);
+          if (!apiBits.length && data.account) apiBits.push(`account=${data.account}`);
+          const level = data.vip_label || data.membership;
+          $('login-message').textContent = [
+            `判断：已登录${level ? ` · ${level}` : ''}`,
+            apiBits.length ? `接口：${apiBits.join(' · ')}` : '',
+          ].filter(Boolean).join('\n');
         } else {
-          $('login-message').textContent = '未登录或凭证已失效（ss1177 仍可解析，但无法下载会员内容）';
+          $('login-message').textContent = data.error
+            ? `判断：未登录或凭证失效\n接口：${data.error}`
+            : '判断：未登录或凭证失效';
         }
-        $('login-status').textContent = ok ? (data.account || '已登录') : '未登录';
+        $('login-status').textContent = ok
+          ? `已登录${data.vip_label || data.membership ? ' · ' + (data.vip_label || data.membership) : ''}`
+          : '未登录';
         $('login-status').classList.toggle('ok', ok);
-
-        const qualities = data.qualities || [];
-        const chips = $('login-check-qualities');
-        chips.innerHTML = '';
-        qualities.forEach((quality) => {
-          const chip = document.createElement('span');
-          chip.className = 'quality-chip';
-          chip.textContent = quality;
-          chips.appendChild(chip);
-        });
-        chips.hidden = !qualities.length;
 
         const detailed = (state.config.log_level || 'simple') === 'detail';
         box.textContent = data.detail || '无输出';

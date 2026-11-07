@@ -6,6 +6,7 @@
 - 所有可能出现在日志里的 cookie / token 都经过掩码处理。
 """
 import base64
+import json
 import os
 import re
 import shutil
@@ -13,6 +14,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import urllib.request
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
@@ -23,6 +25,59 @@ _SECRET_RE = re.compile(
     r"(SESSDATA|bili_jct|DedeUserID__ckMd5|access_token|refresh_token)=([^;\s'\"]+)",
     re.IGNORECASE,
 )
+
+
+def _parse_vip_info(vip):
+    """解析主页名片接口里的 vip 字段。"""
+    if not isinstance(vip, dict):
+        return None
+    try:
+        status = int(vip.get("status") or 0)
+        vip_type = int(vip.get("type") or 0)
+    except (TypeError, ValueError):
+        return None
+    label = ((vip.get("label") or {}).get("text") or "").strip()
+    return {
+        "is_vip": status == 1 and vip_type > 0,
+        "status": status,
+        "type": vip_type,
+        "label": label,
+    }
+
+
+def _fetch_vip_info(uid):
+    """通过主页名片接口获取会员状态；失败返回 None，交由调用方兜底。"""
+    uid = str(uid or "").strip()
+    if not uid.isdigit():
+        return None
+    request = urllib.request.Request(
+        f"https://api.bilibili.com/x/web-interface/card?mid={uid}",
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "zh-CN,zh;q=0.9",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            data = json.loads(response.read(200_000).decode("utf-8", "replace"))
+        if data.get("code") != 0:
+            return None
+        card = (data.get("data") or {}).get("card") or {}
+        return _parse_vip_info(card.get("vip"))
+    except Exception:  # noqa: BLE001 - 会员接口失败不阻断登录检测
+        return None
+
+
+def _membership_from_vip(logged_in, vip):
+    """只根据名片接口/登录状态判断会员，不再用画质推断。"""
+    if not logged_in:
+        return "未登录"
+    if vip is None:
+        return "未知"
+    return "大会员" if vip.get("is_vip") else "普通用户"
 
 
 def mask_secrets(text: str) -> str:
@@ -381,6 +436,118 @@ class BBDownRunner:
             "hint": "已登录",
         }
 
+    def check_login_api(self):
+        """只用 B 站 nav 接口检测登录与会员，不运行视频解析。"""
+        detail_error = ""
+        cookie = ""
+        if os.path.isfile(self.data_path):
+            try:
+                with open(self.data_path, "r", encoding="utf-8", errors="replace") as handle:
+                    cookie = handle.read().strip()
+            except OSError as exc:
+                detail_error = f"无法读取登录凭证：{exc}"
+        if not cookie or "SESSDATA=" not in cookie:
+            detail = json.dumps(
+                {"ok": False, "error": detail_error or "未找到有效登录凭证"},
+                ensure_ascii=False,
+                indent=2,
+            )
+            return {
+                "logged_in": False,
+                "account": "",
+                "login_line": "未登录",
+                "parsed": True,
+                "membership": "未登录",
+                "vip_label": "",
+                "qualities": [],
+                "max_height": 0,
+                "max_label": "",
+                "api": {},
+                "detail": detail,
+                "error": detail_error or "未找到有效登录凭证",
+            }
+
+        request = urllib.request.Request(
+            "https://api.bilibili.com/x/web-interface/nav",
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "zh-CN,zh;q=0.9",
+                "Referer": "https://www.bilibili.com/",
+                "Cookie": cookie,
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                payload = json.loads(response.read(300_000).decode("utf-8", "replace"))
+        except Exception as exc:  # noqa: BLE001 - 网络失败给出明确错误
+            detail = json.dumps(
+                {"ok": False, "error": f"接口请求失败：{exc}"},
+                ensure_ascii=False,
+                indent=2,
+            )
+            return {
+                "logged_in": False,
+                "account": "",
+                "login_line": "登录检测失败",
+                "parsed": True,
+                "membership": "未知",
+                "vip_label": "",
+                "qualities": [],
+                "max_height": 0,
+                "max_label": "",
+                "api": {},
+                "detail": detail,
+                "error": f"接口请求失败：{exc}",
+            }
+
+        nav = payload.get("data") or {}
+        logged_in = bool(nav.get("isLogin"))
+        mid = str(nav.get("mid") or "")
+        vip = _parse_vip_info(nav.get("vip"))
+        if vip is None:
+            vip = _parse_vip_info({
+                "status": nav.get("vipStatus"),
+                "type": nav.get("vipType"),
+                "label": nav.get("vip_label") or {},
+            })
+        membership = _membership_from_vip(logged_in, vip)
+        vip_label = (vip or {}).get("label", "")
+        api_summary = {
+            "isLogin": logged_in,
+            "mid": nav.get("mid"),
+            "uname": nav.get("uname"),
+            "vipStatus": nav.get("vipStatus"),
+            "vipType": nav.get("vipType"),
+            "vipLabel": vip_label,
+            "level": (nav.get("level_info") or {}).get("current_level"),
+        }
+        detail = json.dumps(
+            {
+                "code": payload.get("code"),
+                "message": payload.get("message"),
+                "data": api_summary,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        return {
+            "logged_in": logged_in and bool(mid),
+            "account": f"UID {mid}" if mid else "",
+            "login_line": f"登录状态正常：UID {mid}" if logged_in and mid else "未登录",
+            "parsed": True,
+            "membership": membership,
+            "vip_label": vip_label,
+            "qualities": [],
+            "max_height": 0,
+            "max_label": "",
+            "api": api_summary,
+            "detail": detail,
+            "error": "" if logged_in else (payload.get("message") or ""),
+        }
+
     def probe_login(self, url="ss1177", timeout=90):
         """用一次仅解析验证当前凭证是否可用。"""
         if not self.available():
@@ -480,12 +647,9 @@ class BBDownRunner:
 
         qualities.sort(key=_label_height, reverse=True)
 
-        if max_height >= 2160:
-            membership = "大会员"
-        elif max_height >= 720:
-            membership = "普通用户"
-        else:
-            membership = "未登录"
+        # 会员状态只取主页名片接口；接口失败显示未知，绝不用画质推断
+        vip = _fetch_vip_info(uid) if (logged_in and uid) else None
+        membership = _membership_from_vip(logged_in, vip)
 
         # 去掉带签名的超长 URL，其余完整保留
         url_count = sum(1 for line in lines if "://" in line)
@@ -501,6 +665,8 @@ class BBDownRunner:
             "max_height": max_height,
             "max_label": max_label,
             "membership": membership,
+            "vip": vip or {},
+            "vip_label": (vip or {}).get("label", ""),
             "qualities": qualities,
             "detail": "\n".join(head + detail_lines),
             "returncode": completed.returncode,

@@ -33,7 +33,7 @@ except Exception:  # noqa: BLE001
 import customtkinter as ctk
 
 APP_NAME = "BiliDownloader"
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 PUBLISHER = "AnMo_C"
 EXE_NAME = "BiliDownloader.exe"
 UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\BiliDownloader"
