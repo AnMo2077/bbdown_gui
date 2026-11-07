@@ -1,11 +1,11 @@
-/* BiliDownloader 2.0 — 前端逻辑（无框架、无外部依赖） */
+/* BiliDownloader 2.1 — 前端逻辑（无框架、无外部依赖） */
 (() => {
   'use strict';
 
   const $ = (id) => document.getElementById(id);
 
   const state = {
-    version: '2.0',
+    version: '2.1',
     publisher: 'AnMo_C',
     defaultDir: '',
     config: {},
@@ -20,6 +20,9 @@
     result: '',
     lastOutput: '',
     lastOutputDir: '',
+    queue: [],
+    queueRunning: false,
+    queueIndex: -1,
     forcedShown: false,
     optionalShown: false,
     loginQr: '',
@@ -494,6 +497,13 @@
     renderQrArea();
   }
 
+  function updateQualitySelectLabel() {
+    const globalQuality = String((state.config || {}).dfn_priority || '').trim();
+    const option = document.querySelector('#quality-select option[value=""]');
+    if (option) option.textContent = `跟随全局设置（${globalQuality || '自动'}）`;
+    syncCustomSelects();
+  }
+
   function renderSettings() {
     const config = state.config || {};
     for (const binding of SETTINGS_BINDINGS) {
@@ -502,18 +512,38 @@
       if (binding.type === 'bool') element.checked = !!config[binding.key];
       else element.value = config[binding.key] == null ? '' : String(config[binding.key]);
     }
+    const dfn = $('dfn-priority');
+    const dfnValue = String(config.dfn_priority || '');
+    dfn.querySelectorAll('option[data-custom]').forEach((option) => option.remove());
+    dfn.value = dfnValue;
+    if (dfnValue && dfn.selectedIndex < 0) {
+      const option = document.createElement('option');
+      option.value = dfnValue;
+      option.textContent = `自定义：${dfnValue}`;
+      option.dataset.custom = '1';
+      dfn.appendChild(option);
+      dfn.value = dfnValue;
+    }
     $('appearance-mode').value = config.appearance_mode || 'System';
     $('encoding-select').value = config.encoding_priority || 'hevc,avc,av1';
     $('window-mode').value = config.window_mode || 'edge';
     $('video-only-switch').checked = !!config.video_only;
     $('audio-only-switch').checked = !!config.audio_only;
+    updateQualitySelectLabel();
     syncCustomSelects();
   }
 
   function renderDownloadState() {
-    $('start-button').disabled = state.running;
+    const busy = state.running || state.queueRunning;
+    $('start-button').disabled = busy;
     $('stop-button').disabled = !state.running;
     $('open-output').hidden = state.running || !(state.lastOutput || state.lastOutputDir);
+    if ($('queue-start')) {
+      $('queue-start').disabled = busy || !state.queue.length;
+      $('queue-stop').hidden = !state.queueRunning;
+      $('queue-add').disabled = busy;
+      $('queue-clear').disabled = busy;
+    }
 
     const percent = Math.max(0, Math.min(100, Number(state.progress) || 0));
     $('progress-bar').style.width = `${percent}%`;
@@ -561,6 +591,7 @@
     showPage(document.querySelector('.page.active')?.id.replace('page-', '') || 'home', true);
     scheduleProbePoll();
     syncCustomSelects();
+    renderQueue();
   }
 
   let probeTimer = null;
@@ -611,7 +642,16 @@
         } else if (wasRunning) {
           wasRunning = false;
           const ok = (data.result || '').includes('完成');
-          if (data.result) toast(data.result, ok ? 'info' : 'error');
+          if (state.queueRunning) {
+            const item = state.queue[state.queueIndex];
+            if (item) {
+              item.status = ok ? 'success' : 'failed';
+              renderQueue();
+            }
+            setTimeout(startNextQueueItem, 600);
+          } else if (data.result) {
+            toast(data.result, ok ? 'info' : 'error');
+          }
           await refreshState();
         }
       } else {
@@ -630,6 +670,26 @@
     return ($('url-input').value || '').trim();
   }
 
+  function buildDownloadPayload(url, extra = {}) {
+    const mode = $('part-mode').value;
+    let page = '';
+    if (mode === 'specific') page = ($('page-range').value || '').trim();
+    else if (mode === 'last') page = 'LAST';
+    if (mode === 'specific' && !page) {
+      toast('请输入分 P 编号或范围', 'error');
+      return null;
+    }
+    return {
+      url,
+      page,
+      quality: $('quality-select').value,
+      video_only: $('video-only-switch').checked,
+      audio_mp3: $('audio-only-switch').checked,
+      open_folder: extra.open_folder !== false,
+      ...extra,
+    };
+  }
+
   async function startDownload(url) {
     if (state.running) return toast('已有下载任务在运行', 'error');
     if (!url) {
@@ -637,21 +697,10 @@
       $('url-input').focus();
       return;
     }
-
-    const mode = $('part-mode').value;
-    let page = '';
-    if (mode === 'specific') page = ($('page-range').value || '').trim();
-    else if (mode === 'last') page = 'LAST';
-    if (mode === 'specific' && !page) return toast('请输入分 P 编号或范围', 'error');
-
+    const payload = buildDownloadPayload(url, { open_folder: true });
+    if (!payload) return;
     try {
-      await action('start_download', {
-        url,
-        page,
-        quality: $('quality-select').value,
-        video_only: $('video-only-switch').checked,
-        audio_only: $('audio-only-switch').checked,
-      });
+      await action('start_download', payload);
       $('log-output').textContent = '';
       state.seq = 0;
       state.progress = 0;
@@ -662,6 +711,191 @@
       toast('已开始下载');
     } catch (error) {
       toast(error.message, 'error');
+    }
+  }
+
+  // ---------------------------------------------------------------- //
+  //  下载队列
+  // ---------------------------------------------------------------- //
+  const QUEUE_STATUS = {
+    pending: '等待',
+    downloading: '下载中',
+    success: '完成',
+    failed: '失败',
+    stopped: '已停止',
+  };
+
+  function renderQueue() {
+    const list = $('queue-list');
+    if (!list) return;
+    const busy = state.running || state.queueRunning;
+    list.innerHTML = '';
+    if (!state.queue.length) {
+      const empty = document.createElement('li');
+      empty.className = 'queue-empty';
+      empty.textContent = '队列为空，可一次粘贴多个链接或视频号。';
+      list.appendChild(empty);
+    }
+    state.queue.forEach((item, index) => {
+      const row = document.createElement('li');
+      row.className = 'queue-item';
+
+      const number = document.createElement('span');
+      number.className = 'queue-index';
+      number.textContent = `${index + 1}`;
+      row.appendChild(number);
+
+      const url = document.createElement('span');
+      url.className = 'queue-url';
+      url.textContent = item.url;
+      url.title = item.url;
+      row.appendChild(url);
+
+      const status = document.createElement('span');
+      status.className = `queue-state ${item.status}`;
+      status.textContent = QUEUE_STATUS[item.status] || item.status;
+      row.appendChild(status);
+
+      const up = document.createElement('button');
+      up.className = 'queue-btn';
+      up.textContent = '↑';
+      up.title = '上移';
+      up.disabled = busy || index === 0;
+      up.addEventListener('click', () => moveQueueItem(index, -1));
+      row.appendChild(up);
+
+      const down = document.createElement('button');
+      down.className = 'queue-btn';
+      down.textContent = '↓';
+      down.title = '下移';
+      down.disabled = busy || index === state.queue.length - 1;
+      down.addEventListener('click', () => moveQueueItem(index, 1));
+      row.appendChild(down);
+
+      const remove = document.createElement('button');
+      remove.className = 'queue-btn';
+      remove.textContent = '×';
+      remove.title = '移除';
+      remove.disabled = busy;
+      remove.addEventListener('click', () => removeQueueItem(index));
+      row.appendChild(remove);
+
+      list.appendChild(row);
+    });
+    $('queue-summary').textContent = state.queue.length ? `共 ${state.queue.length} 项` : '';
+    renderDownloadState();
+  }
+
+  function addQueueItems() {
+    if (state.running || state.queueRunning) return toast('请等待当前下载完成', 'error');
+    const raw = $('queue-input').value || '';
+    const parts = raw.split(/[\s,，]+/).map((part) => part.trim()).filter(Boolean);
+    if (!parts.length) return toast('请先粘贴链接或视频号', 'error');
+    const existing = new Set(state.queue.map((item) => item.url));
+    let added = 0;
+    for (const url of parts) {
+      if (existing.has(url)) continue;
+      state.queue.push({ url, status: 'pending' });
+      existing.add(url);
+      added += 1;
+    }
+    $('queue-input').value = '';
+    renderQueue();
+    if (added) toast(`已添加 ${added} 项`);
+    else toast('这些地址已在队列中');
+  }
+
+  function moveQueueItem(index, delta) {
+    if (state.running || state.queueRunning) return;
+    const target = index + delta;
+    if (target < 0 || target >= state.queue.length) return;
+    const [item] = state.queue.splice(index, 1);
+    state.queue.splice(target, 0, item);
+    renderQueue();
+  }
+
+  function removeQueueItem(index) {
+    if (state.running || state.queueRunning) return;
+    state.queue.splice(index, 1);
+    renderQueue();
+  }
+
+  async function startQueue() {
+    if (state.running || state.queueRunning) return toast('已有下载任务在运行', 'error');
+    if (!state.queue.length) return toast('队列为空', 'error');
+    const first = buildDownloadPayload(state.queue[0].url, { open_folder: false });
+    if (!first) return;
+    state.queue.forEach((item) => { item.status = 'pending'; });
+    state.queueRunning = true;
+    state.queueIndex = -1;
+    renderQueue();
+    toast('开始队列下载');
+    await startNextQueueItem();
+  }
+
+  async function startNextQueueItem() {
+    if (!state.queueRunning) return;
+    const index = state.queue.findIndex((item) => item.status === 'pending');
+    if (index < 0) {
+      finishQueue();
+      return;
+    }
+    state.queueIndex = index;
+    const item = state.queue[index];
+    const payload = buildDownloadPayload(item.url, { open_folder: false });
+    if (!payload) {
+      item.status = 'failed';
+      state.queueRunning = false;
+      renderQueue();
+      return;
+    }
+    item.status = 'downloading';
+    renderQueue();
+    try {
+      await action('start_download', payload);
+      $('log-output').textContent = '';
+      state.seq = 0;
+      state.progress = 0;
+      state.result = '';
+      state.running = true;
+      wasRunning = true;
+      renderDownloadState();
+    } catch (error) {
+      item.status = 'failed';
+      renderQueue();
+      setTimeout(startNextQueueItem, 600);
+    }
+  }
+
+  function finishQueue() {
+    const wasRunning = state.queueRunning;
+    state.queueRunning = false;
+    state.queueIndex = -1;
+    renderQueue();
+    if (!wasRunning) return;
+    const ok = state.queue.filter((item) => item.status === 'success').length;
+    const failed = state.queue.filter((item) => item.status === 'failed').length;
+    toast(`队列完成：成功 ${ok} 项${failed ? `，失败 ${failed} 项` : ''}`);
+    if (state.lastOutput || state.lastOutputDir) {
+      action('open_output').catch(() => {});
+    }
+  }
+
+  async function stopQueue() {
+    if (!state.queueRunning) return;
+    state.queueRunning = false;
+    const current = state.queue[state.queueIndex];
+    if (current && current.status === 'downloading') current.status = 'stopped';
+    state.queue.forEach((item) => {
+      if (item.status === 'pending') item.status = 'stopped';
+    });
+    renderQueue();
+    if (state.running) {
+      try {
+        await action('stop_download');
+      } catch (error) {
+        // 忽略停止时的连接错误
+      }
     }
   }
 
@@ -1040,6 +1274,20 @@
         toast(error.message, 'error');
       }
     });
+    $('queue-add').addEventListener('click', addQueueItems);
+    $('queue-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        addQueueItems();
+      }
+    });
+    $('queue-clear').addEventListener('click', () => {
+      if (state.running || state.queueRunning) return toast('请等待当前下载完成', 'error');
+      state.queue = [];
+      renderQueue();
+    });
+    $('queue-start').addEventListener('click', startQueue);
+    $('queue-stop').addEventListener('click', stopQueue);
     $('part-mode').addEventListener('change', (event) => {
       $('page-range-field').hidden = event.target.value !== 'specific';
     });
@@ -1056,6 +1304,7 @@
     };
     $('video-only-switch').addEventListener('change', () => syncModes('video'));
     $('audio-only-switch').addEventListener('change', () => syncModes('audio'));
+    renderQueue();
 
     // 登录
     $('login-refresh').addEventListener('click', async () => {

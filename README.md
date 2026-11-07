@@ -11,6 +11,8 @@ Windows 下的 B 站视频下载器：本地 Web UI（WinUI 3 Fluent 风格）�
 ## 功能
 
 - 视频 / 番剧 / 分 P 下载，支持 8K、4K、1080P 高码率等清晰度
+- 下载队列：一次粘贴多个链接或视频号，调整顺序后依次批量下载
+- 仅下载音频（MP3）：自动调用 ffmpeg 转码并清理原始音频
 - 扫码登录 B 站账号，自动显示会员等级与可用清晰度
 - 支持 Cookie / Access Token、TV / APP / 国际版接口
 - aria2c 多线程或 BBDown 内置下载，可跳过混流、字幕、封面、弹幕
@@ -33,10 +35,12 @@ Windows 下的 B 站视频下载器：本地 Web UI（WinUI 3 Fluent 风格）�
 
 ## 下载与安装
 
-从 [Releases](https://github.com/AnMo2077/bbdown_gui/releases) 下载 `BiliDownloader-Setup-2.0.exe`。
+从 [Releases](https://github.com/AnMo2077/bbdown_gui/releases) 下载 `BiliDownloader-Setup-2.1.exe`。
 
 - 默认安装到 `%LOCALAPPDATA%\Programs\BiliDownloader`（当前用户，无需管理员）
 - 安装时可自行修改安装路径
+- 自动检测已安装旧版本，显示版本号与路径，可直接覆盖安装
+- 可选创建桌面快捷方式、开始菜单快捷方式、安装完成后运行（前两项默认开启，安装后运行默认关闭）
 - 创建桌面与开始菜单快捷方式，并写入当前用户的卸载项
 - 不安装服务、不写自启动项
 
@@ -105,7 +109,7 @@ py -m pip install -r requirements.txt pyinstaller pillow
 py build_installer.py
 ```
 
-产物：`dist\BiliDownloader-Setup-2.0.exe`
+产物：`dist\BiliDownloader-Setup-2.1.exe`
 
 构建流程：PyInstaller 打包应用（onedir）→ 复制 BBDown / ffmpeg / aria2c / curl 与 DLL → 打包卸载器 → 压缩 payload → 生成单文件安装程序。
 
@@ -116,7 +120,7 @@ py build_installer.py
 工作流：`.github/workflows/build.yml`
 
 - **push / pull_request**：编译检查 + 单元测试
-- **workflow_dispatch**：构建安装包并上传 Artifact；`release_tag` 默认 `v2.0`，填写后会创建/更新对应 Release
+- **workflow_dispatch**：构建安装包并上传 Artifact；`release_tag` 默认 `v2.1`，填写后会创建/更新对应 Release
 - **推送 `v*` 标签**：构建安装包、上传 Artifact，并自动创建 GitHub Release
 
 第三方二进制会缓存到 `vendor/`，缓存键包含脚本哈希。构建前会校验版本与发布者，安装包生成后输出 SHA256。

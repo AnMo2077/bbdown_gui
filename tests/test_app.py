@@ -182,7 +182,7 @@ class ServerTests(unittest.TestCase):
     def test_announce_update_flags(self):
         api = self.server.api
         api.fetched = True
-        api.prog_ver = "2.1"
+        api.prog_ver = "2.2"
         api.update = "y"
         api.url = "https://example.com/new"
         announce = self.server._announce()
@@ -199,7 +199,7 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(announce["update"])
         self.assertFalse(announce["must_update"])
 
-        api.prog_ver = "2.0"
+        api.prog_ver = "2.1"
         api.update = "y"
         announce = self.server._announce()
         self.assertFalse(announce["update"])

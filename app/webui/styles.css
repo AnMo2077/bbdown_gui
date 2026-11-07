@@ -1,4 +1,4 @@
-/* BiliDownloader 2.0 — 依据实机截图还原的深色 Fluent 界面 */
+/* BiliDownloader 2.1 — 依据实机截图还原的深色 Fluent 界面 */
 :root {
   --sidebar-w: 240px;
   --radius: 8px;
@@ -416,6 +416,36 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; font-family:
 .checks { display: flex; flex-wrap: wrap; gap: 10px 22px; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); cursor: pointer; user-select: none; }
 .check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
+.queue-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  background: var(--card-2);
+}
+.queue-index { min-width: 18px; text-align: right; font-size: 11.5px; color: var(--text-3); }
+.queue-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-2); }
+.queue-state { white-space: nowrap; font-size: 11.5px; color: var(--text-3); }
+.queue-state.success { color: var(--ok); }
+.queue-state.failed { color: var(--danger); }
+.queue-state.downloading { color: var(--accent); }
+.queue-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-2);
+  line-height: 1;
+  cursor: pointer;
+}
+.queue-btn:hover { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
+.queue-btn:disabled { opacity: 0.35; cursor: default; }
+.queue-empty { padding: 8px 0; font-size: 12px; color: var(--text-3); }
 
 /* ---------------- 下载 ---------------- */
 .progress { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }

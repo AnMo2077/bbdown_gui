@@ -18,15 +18,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .api import RemoteAPI
-from .bbdown import BBDownRunner, mask_secrets
+from .bbdown import BBDownRunner, decode_line, mask_secrets
 from .qrlogin import BiliQRLogin
 from .config import ConfigManager, DEFAULT_CONFIG
 
-APP_VERSION = "2.0"
+APP_VERSION = "2.1"
 PUBLISHER = "AnMo_C"
 LOG_LIMIT = 800
 CORE_FILES = ("BBDown.exe", "curl.exe", "aria2c.exe", "ffmpeg.exe")
-MEDIA_EXTENSIONS = (".mp4", ".mkv", ".flv", ".m4a", ".webm", ".ts", ".avi")
+MEDIA_EXTENSIONS = (
+    ".mp4", ".mkv", ".flv", ".webm", ".ts", ".avi",
+    ".m4a", ".aac", ".flac", ".wav", ".ogg", ".opus", ".wma", ".eac3", ".ac3", ".mp3",
+)
+AUDIO_EXTENSIONS = (".m4a", ".aac", ".flac", ".wav", ".ogg", ".opus", ".wma", ".eac3", ".ac3", ".mp3")
+CREATE_NO_WINDOW = 0x08000000
 
 
 def _app_home():
@@ -401,6 +406,13 @@ class AppServer:
             overrides["video_only"] = bool(payload["video_only"])
         if "audio_only" in payload:
             overrides["audio_only"] = bool(payload["audio_only"])
+        audio_mp3 = bool(payload.get("audio_mp3"))
+        if audio_mp3:
+            overrides["audio_only"] = True
+            overrides["skip_cover"] = True
+            overrides["skip_subtitle"] = True
+            overrides["download_danmaku"] = False
+        open_folder = bool(payload.get("open_folder", True))
 
         with self._lock:
             self._log = []
@@ -429,7 +441,9 @@ class AppServer:
             output_file = ""
             output_dir = ""
             if status == "success":
-                output_file, output_dir = self._collect_outputs(started)
+                if audio_mp3 and not self._convert_audio_files(started):
+                    message = "下载完成，但 MP3 转换失败（请检查 ffmpeg）"
+                output_file, output_dir = self._collect_outputs(started, open_folder)
             with self._lock:
                 self._running = False
                 self._last_result = message
@@ -554,7 +568,89 @@ class AppServer:
                 return candidate
         return target
 
-    def _collect_outputs(self, started):
+    def _audio_files(self, root, started):
+        """列出本次下载产生的新音频文件（按修改时间升序）。"""
+        if not os.path.isdir(root):
+            return []
+        found = []
+        base_depth = root.rstrip("\\/").count(os.sep)
+        try:
+            for dirpath, dirnames, filenames in os.walk(root):
+                if dirpath.rstrip("\\/").count(os.sep) - base_depth > 6:
+                    dirnames[:] = []
+                    continue
+                for name in filenames:
+                    if not name.lower().endswith(AUDIO_EXTENSIONS):
+                        continue
+                    path = os.path.join(dirpath, name)
+                    try:
+                        stat = os.stat(path)
+                    except OSError:
+                        continue
+                    if stat.st_size < 64 * 1024 or stat.st_mtime < started - 10:
+                        continue
+                    found.append((stat.st_mtime, path))
+        except OSError:
+            pass
+        found.sort()
+        return [path for _, path in found]
+
+    def _convert_audio_files(self, started):
+        """把本次下载的音频转为 mp3，成功后删除原始音频。"""
+        root = str(self.config.get("work_dir") or "").strip() or self._default_work_dir()
+        files = self._audio_files(root, started)
+        if not files:
+            return True
+        ffmpeg = str(self.config.get("ffmpeg_path") or "").strip()
+        if not ffmpeg:
+            ffmpeg = os.path.join(self.base_dir, "ffmpeg.exe")
+        if not os.path.isfile(ffmpeg):
+            self._append_log("MP3 转换失败：未找到 ffmpeg.exe")
+            return False
+        success = True
+        for source in files:
+            if source.lower().endswith(".mp3"):
+                continue
+            destination = os.path.splitext(source)[0] + ".mp3"
+            self._append_log(f"转换 MP3: {os.path.basename(source)}")
+            try:
+                completed = subprocess.run(
+                    [
+                        ffmpeg,
+                        "-y",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        source,
+                        "-vn",
+                        "-codec:a",
+                        "libmp3lame",
+                        "-q:a",
+                        "2",
+                        destination,
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    timeout=600,
+                    creationflags=CREATE_NO_WINDOW,
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                self._append_log(f"MP3 转换异常: {exc}")
+                success = False
+                continue
+            if completed.returncode == 0 and os.path.isfile(destination):
+                try:
+                    os.remove(source)
+                except OSError:
+                    pass
+            else:
+                detail = decode_line(completed.stdout or b"").strip()
+                self._append_log(f"MP3 转换失败: {detail[:300]}")
+                success = False
+        return success
+
+    def _collect_outputs(self, started, open_folder=True):
         """把本次下载产生的视频/剧集文件夹移动到程序目录的 Downloads，并打开它。"""
         source = str(self.config.get("work_dir") or "").strip() or self._default_work_dir()
         source_abs = os.path.abspath(source)
@@ -606,10 +702,11 @@ class AppServer:
                 break
         if not final:
             final = self._newest_media(target_abs, started)
-        try:
-            os.startfile(target_abs)  # noqa: S606 - 仅打开下载目录
-        except OSError:
-            pass
+        if open_folder:
+            try:
+                os.startfile(target_abs)  # noqa: S606 - 仅打开下载目录
+            except OSError:
+                pass
         return final, target_abs
 
     def _action_open_output(self, payload):
@@ -855,7 +952,7 @@ def _version_tuple(text):
 
 def _make_handler(app):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "BiliDownloader/2.0"
+        server_version = "BiliDownloader/2.1"
 
         def log_message(self, fmt, *args):  # noqa: A003 - 静默访问日志
             return

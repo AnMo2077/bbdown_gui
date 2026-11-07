@@ -11,7 +11,7 @@ class RemoteAPI:
 
     远端文本格式（逐行 key=value）::
 
-        prog_ver=2.0
+        prog_ver=2.1
         ad=公告内容
         log=更新日志
         update=y
@@ -24,7 +24,7 @@ class RemoteAPI:
     DONATE_URL = "https://api2.nzs233.xyz/eat"
 
     TIMEOUT = 8
-    USER_AGENT = "BiliDownloader/2.0 (+https://github.com/AnMo2077/bbdown_gui)"
+    USER_AGENT = "BiliDownloader/2.1 (+https://github.com/AnMo2077/bbdown_gui)"
 
     def __init__(self):
         self.ad = "正在获取公告..."
