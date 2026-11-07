@@ -135,6 +135,17 @@ class BBDownTests(unittest.TestCase):
         self.assertEqual(_membership_from_vip(True, None), "未知")
         self.assertEqual(_membership_from_vip(False, None), "未登录")
 
+    def test_account_state_uses_configured_cookie(self):
+        with tempfile.TemporaryDirectory() as base:
+            runner = BBDownRunner(
+                base,
+                lambda: {"cookie": "SESSDATA=test; DedeUserID=123456"},
+            )
+            state = runner.account_state()
+            self.assertTrue(state["logged_in"])
+            self.assertEqual(state["mid"], "123456")
+            self.assertEqual(state["source"], "设置 Cookie")
+
     def test_build_args_basic(self):
         self.config.update(
             encoding_priority="hevc,avc",

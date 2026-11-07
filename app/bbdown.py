@@ -418,37 +418,54 @@ class BBDownRunner:
     # ------------------------------------------------------------------ #
     #  登录
     # ------------------------------------------------------------------ #
-    def account_state(self):
-        """根据 BBDown.data 判断登录状态。"""
+    def _read_bbdown_cookie(self):
         if not os.path.isfile(self.data_path):
-            return {"logged_in": False, "mid": "", "hint": "未登录"}
+            return ""
         try:
             with open(self.data_path, "r", encoding="utf-8", errors="replace") as handle:
-                text = handle.read()
+                return handle.read().strip()
         except OSError:
-            return {"logged_in": False, "mid": "", "hint": "无法读取登录信息"}
-        if "SESSDATA=" not in text:
-            return {"logged_in": False, "mid": "", "hint": "登录信息不完整"}
-        match = re.search(r"DedeUserID=(\d+)", text)
+            return ""
+
+    def _configured_cookie(self):
+        try:
+            return str((self.get_config() or {}).get("cookie") or "").strip()
+        except Exception:  # noqa: BLE001
+            return ""
+
+    def _credential_cookie(self):
+        """优先扫码凭证，其次设置页 Cookie。"""
+        cookie = self._read_bbdown_cookie()
+        if "SESSDATA=" in cookie:
+            return cookie
+        cookie = self._configured_cookie()
+        if "SESSDATA=" in cookie:
+            return cookie
+        return ""
+
+    def account_state(self):
+        """根据扫码凭证或设置页 Cookie 判断登录状态。"""
+        cookie = self._read_bbdown_cookie()
+        source = "BBDown.data"
+        if "SESSDATA=" not in cookie:
+            cookie = self._configured_cookie()
+            source = "设置 Cookie"
+        if "SESSDATA=" not in cookie:
+            return {"logged_in": False, "mid": "", "hint": "未登录", "source": ""}
+        match = re.search(r"DedeUserID=(\d+)", cookie)
         return {
             "logged_in": True,
             "mid": match.group(1) if match else "",
             "hint": "已登录",
+            "source": source,
         }
 
     def check_login_api(self):
         """只用 B 站 nav 接口检测登录与会员，不运行视频解析。"""
-        detail_error = ""
-        cookie = ""
-        if os.path.isfile(self.data_path):
-            try:
-                with open(self.data_path, "r", encoding="utf-8", errors="replace") as handle:
-                    cookie = handle.read().strip()
-            except OSError as exc:
-                detail_error = f"无法读取登录凭证：{exc}"
-        if not cookie or "SESSDATA=" not in cookie:
+        cookie = self._credential_cookie()
+        if not cookie:
             detail = json.dumps(
-                {"ok": False, "error": detail_error or "未找到有效登录凭证"},
+                {"ok": False, "error": "未在 BBDown.data 或设置中找到有效 Cookie"},
                 ensure_ascii=False,
                 indent=2,
             )
@@ -464,7 +481,7 @@ class BBDownRunner:
                 "max_label": "",
                 "api": {},
                 "detail": detail,
-                "error": detail_error or "未找到有效登录凭证",
+                "error": "未在 BBDown.data 或设置中找到有效 Cookie",
             }
 
         request = urllib.request.Request(

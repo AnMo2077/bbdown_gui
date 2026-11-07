@@ -328,8 +328,8 @@ class AppServer:
             pass
         self.write_log(f"服务已启动: {self.url}")
 
-        # 启动时若已有登录文件，后台自动跑一次状态检测（不阻塞开窗）
-        if os.path.isfile(self.runner.data_path):
+        # 启动时若已有登录凭证（BBDown.data 或设置 Cookie），后台自动检测
+        if self.runner.account_state().get("logged_in"):
             self._probe = {"status": "checking"}
             threading.Thread(
                 target=self._refresh_nickname, args=(True,), daemon=True, name="nickname"
@@ -351,9 +351,15 @@ class AppServer:
         if result.get("logged_in"):
             self._refresh_nickname(force=True)
 
+    def _probe_mid(self):
+        with self._lock:
+            return str((self._probe.get("api") or {}).get("mid") or "")
+
     def _account_with_nickname(self):
         account = self.runner.account_state()
-        mid = str(account.get("mid") or "")
+        mid = str(account.get("mid") or "") or self._probe_mid()
+        if mid:
+            account["mid"] = mid
         with self._lock:
             nickname = self._nickname if (mid and self._nickname_uid == mid) else ""
         account["nickname"] = nickname
@@ -361,7 +367,7 @@ class AppServer:
 
     def _refresh_nickname(self, force=False):
         account = self.runner.account_state()
-        mid = str(account.get("mid") or "")
+        mid = str(account.get("mid") or "") or self._probe_mid()
         if not account.get("logged_in") or not mid:
             with self._lock:
                 self._nickname = ""
@@ -373,7 +379,7 @@ class AppServer:
                     return self._nickname
         name = _fetch_bili_nickname(mid)
         with self._lock:
-            current_mid = str(self.runner.account_state().get("mid") or "")
+            current_mid = str(self.runner.account_state().get("mid") or "") or self._probe_mid()
             if current_mid == mid:
                 if name:
                     self._nickname = name
